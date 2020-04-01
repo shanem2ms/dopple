@@ -17,7 +17,8 @@ namespace FaceServer
             eDepth = 2,
             eFaceMesh = 4,
             eCombinedFace = 16,
-            eAll = 31
+            eDepthPlanes = 32,
+            eAll = 63
         }
 
 

@@ -16,14 +16,17 @@ Global
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{91E6A3D9-178A-430C-A6D6-83FF98B69AF9}.Debug|iPhone.ActiveCfg = Debug|iPhone
 		{91E6A3D9-178A-430C-A6D6-83FF98B69AF9}.Debug|iPhone.Build.0 = Debug|iPhone
+		{91E6A3D9-178A-430C-A6D6-83FF98B69AF9}.Debug|iPhone.Deploy.0 = Debug|iPhone
 		{91E6A3D9-178A-430C-A6D6-83FF98B69AF9}.Debug|iPhoneSimulator.ActiveCfg = Debug|iPhoneSimulator
 		{91E6A3D9-178A-430C-A6D6-83FF98B69AF9}.Debug|iPhoneSimulator.Build.0 = Debug|iPhoneSimulator
 		{91E6A3D9-178A-430C-A6D6-83FF98B69AF9}.Release|iPhone.ActiveCfg = Release|iPhone
 		{91E6A3D9-178A-430C-A6D6-83FF98B69AF9}.Release|iPhone.Build.0 = Release|iPhone
+		{91E6A3D9-178A-430C-A6D6-83FF98B69AF9}.Release|iPhone.Deploy.0 = Release|iPhone
 		{91E6A3D9-178A-430C-A6D6-83FF98B69AF9}.Release|iPhoneSimulator.ActiveCfg = Release|iPhoneSimulator
 		{91E6A3D9-178A-430C-A6D6-83FF98B69AF9}.Release|iPhoneSimulator.Build.0 = Release|iPhoneSimulator
 		{91E6A3D9-178A-430C-A6D6-83FF98B69AF9}.ReleaseNoOpt|iPhone.ActiveCfg = ReleaseNoOpt|iPhone
 		{91E6A3D9-178A-430C-A6D6-83FF98B69AF9}.ReleaseNoOpt|iPhone.Build.0 = ReleaseNoOpt|iPhone
+		{91E6A3D9-178A-430C-A6D6-83FF98B69AF9}.ReleaseNoOpt|iPhone.Deploy.0 = ReleaseNoOpt|iPhone
 		{91E6A3D9-178A-430C-A6D6-83FF98B69AF9}.ReleaseNoOpt|iPhoneSimulator.ActiveCfg = ReleaseNoOpt|iPhoneSimulator
 		{91E6A3D9-178A-430C-A6D6-83FF98B69AF9}.ReleaseNoOpt|iPhoneSimulator.Build.0 = ReleaseNoOpt|iPhoneSimulator
 	EndGlobalSection

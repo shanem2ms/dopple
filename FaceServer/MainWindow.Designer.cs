@@ -45,6 +45,7 @@
             this.wholeFaceCB = new System.Windows.Forms.CheckBox();
             this.ipAddressLabel = new System.Windows.Forms.Label();
             this.recordingPanel = new System.Windows.Forms.Panel();
+            this.meshDepthOffsetY = new System.Windows.Forms.TextBox();
             this.alignEndFrmTB = new System.Windows.Forms.TextBox();
             this.alignStepFrmTB = new System.Windows.Forms.TextBox();
             this.alignStartFrmTB = new System.Windows.Forms.TextBox();
@@ -88,7 +89,7 @@
             this.meshNameLbl = new System.Windows.Forms.Label();
             this.meshAlignLbl = new System.Windows.Forms.Label();
             this.dataPanel = new System.Windows.Forms.Panel();
-            this.meshDepthOffsetY = new System.Windows.Forms.TextBox();
+            this.depthPlanesCB = new System.Windows.Forms.CheckBox();
             label1 = new System.Windows.Forms.Label();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).BeginInit();
             this.splitContainer1.Panel2.SuspendLayout();
@@ -212,6 +213,7 @@
             // 
             // panel1
             // 
+            this.panel1.Controls.Add(this.depthPlanesCB);
             this.panel1.Controls.Add(label1);
             this.panel1.Controls.Add(this.facePtCloudCB);
             this.panel1.Controls.Add(this.depthCB);
@@ -291,6 +293,14 @@
             this.recordingPanel.Name = "recordingPanel";
             this.recordingPanel.Size = new System.Drawing.Size(1963, 170);
             this.recordingPanel.TabIndex = 19;
+            // 
+            // meshDepthOffsetY
+            // 
+            this.meshDepthOffsetY.BorderStyle = System.Windows.Forms.BorderStyle.None;
+            this.meshDepthOffsetY.Location = new System.Drawing.Point(973, 91);
+            this.meshDepthOffsetY.Name = "meshDepthOffsetY";
+            this.meshDepthOffsetY.Size = new System.Drawing.Size(72, 19);
+            this.meshDepthOffsetY.TabIndex = 24;
             // 
             // alignEndFrmTB
             // 
@@ -732,13 +742,15 @@
             this.dataPanel.TabIndex = 10;
             this.dataPanel.Visible = false;
             // 
-            // meshDepthOffsetY
+            // depthPlanesCB
             // 
-            this.meshDepthOffsetY.BorderStyle = System.Windows.Forms.BorderStyle.None;
-            this.meshDepthOffsetY.Location = new System.Drawing.Point(973, 91);
-            this.meshDepthOffsetY.Name = "meshDepthOffsetY";
-            this.meshDepthOffsetY.Size = new System.Drawing.Size(72, 19);
-            this.meshDepthOffsetY.TabIndex = 24;
+            this.depthPlanesCB.AutoSize = true;
+            this.depthPlanesCB.Location = new System.Drawing.Point(161, 38);
+            this.depthPlanesCB.Name = "depthPlanesCB";
+            this.depthPlanesCB.Size = new System.Drawing.Size(131, 24);
+            this.depthPlanesCB.TabIndex = 4;
+            this.depthPlanesCB.Text = "Depth Planes";
+            this.depthPlanesCB.UseVisualStyleBackColor = true;
             // 
             // MainWindow
             // 
@@ -840,5 +852,6 @@
         private System.Windows.Forms.TextBox alignStepFrmTB;
         private System.Windows.Forms.TextBox alignStartFrmTB;
         private System.Windows.Forms.TextBox meshDepthOffsetY;
+        private System.Windows.Forms.CheckBox depthPlanesCB;
     }
 }

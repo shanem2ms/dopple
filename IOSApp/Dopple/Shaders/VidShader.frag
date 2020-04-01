@@ -34,7 +34,7 @@ void main()
 		float invMax = 1.0 / depthVals.y;
 		float d = texture2D(depthSampler, depthTexCoord).r;
 		float maskVal = (d < 0.75 && d > 0.01) ? 1.0 : 0.0;
-		gl_FragColor = vec4(rgb * maskVal, 1);
+		gl_FragColor = vec4(d, d, d, 1);
 	}
 	else
 	{

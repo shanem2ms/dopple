@@ -192,27 +192,29 @@ namespace Dopple
                 rec.Frames[curFrame].BuildData(settings, maxFrameBuilt?.minbnd,
                     maxFrameBuilt?.maxbnd);
                 Vector3 minb, maxb;
-                rec.Frames[curFrame].ptMesh.GetMinMax(out minb, out maxb);
-                Matrix4 wm = rec.Frames[curFrame].ptMesh.worldMatrix.Gl;
-                minb = Vector3.TransformPosition(minb, wm);
-                maxb = Vector3.TransformPosition(maxb, wm);
-
-                lock (rec.alignRequests)
+                if (rec.Frames[curFrame].ptMesh != null)
                 {
-                    alignTo = ((curFrame - 2) / alignTo) * alignTo + 1;
-                    rec.alignRequests.Add(new Tuple<int, int>(curFrame, alignTo));
+                    rec.Frames[curFrame].ptMesh.GetMinMax(out minb, out maxb);
+                    Matrix4 wm = rec.Frames[curFrame].ptMesh.worldMatrix.Gl;
+                    minb = Vector3.TransformPosition(minb, wm);
+                    maxb = Vector3.TransformPosition(maxb, wm);
 
-                    if (maxFrameBuilt == null || curFrame > maxFrameBuilt.frame)
+                    lock (rec.alignRequests)
                     {
-                        maxFrameBuilt = new LastBuiltInfo()
+                        alignTo = ((curFrame - 2) / alignTo) * alignTo + 1;
+                        rec.alignRequests.Add(new Tuple<int, int>(curFrame, alignTo));
+
+                        if (maxFrameBuilt == null || curFrame > maxFrameBuilt.frame)
                         {
-                            frame = curFrame,
-                            minbnd = minb,
-                            maxbnd = maxb
-                        };
+                            maxFrameBuilt = new LastBuiltInfo()
+                            {
+                                frame = curFrame,
+                                minbnd = minb,
+                                maxbnd = maxb
+                            };
+                        }
                     }
                 }
-
                 int completed = Interlocked.Increment(ref nCompleted);
                 rec.OnFrameProcessed(rec, new OnFrameProcessedArgs(curFrame, completed, rec.NumFrames(), 0));
             }

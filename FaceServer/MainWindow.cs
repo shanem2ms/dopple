@@ -476,7 +476,7 @@ namespace FaceServer
                 this.activeRecording.OnMeshBuilt += ActiveRecording_OnMeshBuilt;
                 this.activeRecording.Name = Path.GetFileNameWithoutExtension(path);
                 this.activeRecording.BuildMeshesThreaded(this.settings);
-                this.glView.VMode = GLView.ViewMode.eCombinedFace;
+                this.glView.VMode = GLView.ViewMode.eDepth;
                 RefreshViewCtrls();
                 RefreshActiveRecording();
                 this.exportAllBtn.Enabled = false;
@@ -739,6 +739,7 @@ namespace FaceServer
                 glView.SetCurrentFrame(f);
                 Matrix4 meshWorldTransform = Matrix4.Identity;
                 this.meshes.Clear();
+                if (f.ptMesh != null)
                 {
                     ActiveMesh am = new ActiveMesh();
                     am.id = 0;
@@ -837,7 +838,8 @@ namespace FaceServer
             this.glView.VMode =
                 (this.videoCB.Checked ? GLView.ViewMode.eImage : 0) |
                 (this.depthCB.Checked ? GLView.ViewMode.eDepth : 0) |                
-                (this.wholeFaceCB.Checked ? GLView.ViewMode.eCombinedFace : 0);
+                (this.wholeFaceCB.Checked ? GLView.ViewMode.eCombinedFace : 0) |
+                (this.depthPlanesCB.Checked ? GLView.ViewMode.eDepthPlanes : 0);
         }
 
         private void LoadMeshBtn_Click(object sender, EventArgs e)

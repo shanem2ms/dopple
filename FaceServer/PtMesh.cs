@@ -384,7 +384,7 @@ namespace Dopple
                             nrm.Add(modelNrm);
                             if (vf.imageData != null)
                                 col.Add(vf.GetRGBVal(x * vf.ImageWidth / depthWidth, y *
-                                    vf.ImageHeight / depthHeight));
+                                    (vf.ImageHeight -1)/ depthHeight));
                             else
                                 col.Add(new Vector3((float)x / depthWidth, (float)y / depthHeight, 0));
                         }
@@ -394,6 +394,9 @@ namespace Dopple
 
             mesh.depthWidth = depthWidth;
             mesh.depthHeight = depthHeight;
+            if (pos.Count == 0)
+                return null;
+
             mesh.pos = pos.ToArray();
             mesh.color = Array.ConvertAll(col.ToArray(), v => new V3(v));
             mesh.normal = Array.ConvertAll(nrm.ToArray(), v => new V3(v));

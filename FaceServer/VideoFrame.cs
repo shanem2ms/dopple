@@ -26,7 +26,7 @@ namespace Dopple
         public byte[] depthData;
         public byte[] imageData;
 
-        public bool HasDepth {  get { return this.DepthStride != 0; } }
+        public bool HasDepth { get { return this.DepthStride != 0; } }
         public int ImageWidth { get { return this.imageWidth; } }
         public int ImageHeight { get { return this.imageHeight; } }
         public int ImageBytesPerRow { get { return this.imageBytesPerRow; } }
@@ -58,7 +58,7 @@ namespace Dopple
                 for (int x = 0; x < DepthWidth; ++x)
                 {
                     float val = vals[y * DepthWidth + x];
-                    if (!float.IsNaN(val) && 
+                    if (!float.IsNaN(val) &&
                         val > 0)
                     {
                         if (!isinit)
@@ -99,6 +99,134 @@ namespace Dopple
             Marshal.Copy(imageBuffer, this.imageData, 0, this.imageData.Length);
             Marshal.FreeHGlobal(imageBuffer);
         }
+
+        [DllImport("ptslib.dll")]
+        public static extern void DepthFindEdges(IntPtr pDepthBuffer, IntPtr pOutNormals, int depthWidth, int depthHeight);
+
+        [DllImport("ptslib.dll")]
+        public static extern void DepthFindNormals(IntPtr pDepthPts, IntPtr pOutNormals, int ptx, int pty, int depthWidth, int depthHeight);
+
+        [DllImport("ptslib.dll")]
+        public static extern void DepthMakePlanes(IntPtr pDepthPts, IntPtr pOutVertices, IntPtr pOutTexCoords, int numVertices, out int vertexCnt,
+            int px, int py, int depthWidth, int depthHeight);
+
+        [DllImport("msvcrt.dll", EntryPoint = "memcpy",
+        CallingConvention = CallingConvention.Cdecl, SetLastError = false)]
+        public static extern IntPtr memcpy(IntPtr dest, IntPtr src, UIntPtr count);
+
+
+        private Vector3[] depthQuads = null;
+        private Vector3[] depthTexColors = null;
+        private Vector3[] depthNormals = null;
+        private uint[] depthindices = null;
+        float[] normvals = null;
+        float[] depthCamPts = null;
+        int genCount;
+
+
+        Vector3 []GetDepthPoints()
+        {
+            int depthHeight = DepthHeight;
+            int depthWidth = DepthWidth;
+
+            float[] vals = new float[depthHeight * depthWidth];
+            float[] valsdx = new float[depthHeight * depthWidth];
+            float[] valsdy = new float[depthHeight * depthWidth];
+
+
+            System.Buffer.BlockCopy(depthData, 0, vals,
+                0, depthHeight * depthWidth * 4);
+            Array.Copy(vals, valsdx, vals.Length);
+            Array.Copy(vals, valsdy, vals.Length);
+
+            float ratioX = cameraCalibrationDims.X / depthWidth;
+            float ratioY = cameraCalibrationDims.Y / depthHeight;
+            Vector4 cMat = cameraCalibrationVals;
+            float xScl = cMat.X / ratioX;
+            float yScl = cMat.Y / ratioY;
+            float xOff = cMat.Z / ratioX + 30;
+            float yOff = cMat.W / ratioY;
+
+            Matrix4 matTransform = Matrix4.CreateRotationZ(-(float)Math.PI / 2.0f) *
+                Matrix4.CreateRotationY((float)Math.PI);
+
+            int dOffsetX = 0;
+            int dOffsetY = 0;
+            float dSclX = 1.0f;
+            float dSclY = 1.0f;
+
+            List<Vector3> pos = new List<Vector3>();
+
+            for (int y = 0; y < depthHeight; ++y)
+            {
+                for (int x = 0; x < depthWidth; ++x)
+                {
+                    int dx = (int)(((x - depthWidth / 2) + dOffsetX) * dSclX) +
+                        depthWidth / 2;
+                    int dy = (int)(((y - depthHeight / 2) + dOffsetY) * dSclY) +
+                        depthHeight / 2;
+
+
+                    float depthVal = float.NaN;
+                    if (dx >= 0 && dx < depthWidth &&
+                        dy >= 0 && dy < depthHeight)
+                        depthVal = vals[dy * depthWidth + dx];
+                    if (!float.IsNaN(depthVal) && depthVal < 1)
+                    {
+                        float xrw = (x - xOff) * depthVal / xScl;
+                        float yrw = (y - yOff) * depthVal / yScl;
+                        Vector4 viewPos = new Vector4(xrw, yrw, depthVal, 1);
+                        Vector4 modelPos = viewPos * matTransform;
+
+                        float depthdx = valsdx[dy * depthWidth + dx];
+                        float depthdy = valsdy[dy * depthWidth + dx];
+                        Vector3 vector4Normal = new Vector3(depthdx / xScl * 10,
+                            depthdy / yScl * 10, depthVal);
+                        vector4Normal.Normalize();
+                        Vector3 modelNrm = Vector3.TransformNormal(vector4Normal, matTransform);
+                        pos.Add(new Vector3(modelPos.X, modelPos.Y, modelPos.Z));
+                    }
+                    else
+                    {
+                        pos.Add(new Vector3(float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity));
+                    }  
+                }
+            }
+
+            return pos.ToArray();
+        }
+
+
+        public void MakePlanes()
+        {
+            int bytesPerFrame = DepthStride * DepthHeight * 3;
+            this.depthQuads = new Vector3[DepthWidth * DepthHeight * 6];
+            IntPtr depthPtsPtr = Marshal.AllocHGlobal(bytesPerFrame);
+            IntPtr depthNrmPtr = Marshal.AllocHGlobal(bytesPerFrame);
+            IntPtr genVerticesPtr = Marshal.AllocHGlobal(depthQuads.Length * 12);
+            IntPtr genTexCoordsPtr = Marshal.AllocHGlobal(depthQuads.Length * 12);
+
+            Vector3[] pts = GetDepthPoints();
+            int v3size = Marshal.SizeOf(pts[0]);
+            for (int idx = 0; idx < pts.Length; ++idx)
+            {
+                Marshal.StructureToPtr(pts[idx], depthPtsPtr + idx * v3size, false);
+            }
+            DepthFindNormals(depthPtsPtr, depthNrmPtr, 0, 0, DepthWidth, DepthHeight);
+            DepthMakePlanes(depthPtsPtr, genVerticesPtr, genTexCoordsPtr, depthQuads.Length, out genCount,
+                0, 0, DepthWidth, DepthHeight);
+
+            Vector3 []quadPts = new Vector3[depthQuads.Length];
+            for (int idx = 0; idx < depthQuads.Length; ++idx)
+            {
+                quadPts[idx] = (Vector3)Marshal.PtrToStructure(genVerticesPtr + idx * 12, typeof(Vector3));                
+            }
+            Marshal.FreeHGlobal(depthPtsPtr);
+            Marshal.FreeHGlobal(depthNrmPtr);
+            Marshal.FreeHGlobal(genVerticesPtr);
+            Marshal.FreeHGlobal(genTexCoordsPtr);
+        }
+
         public Vector3 GetRGBVal(int ix, int iy)
         {
             int uvWidth = (this.ImageWidth);
