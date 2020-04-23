@@ -75,8 +75,18 @@ extern "C"
 
     typedef std::shared_ptr<Result> ResultPtr;
 
-    const float mindist = 0.05f;
+    float g_mindist = 0.05f;
+    float g_splitThreshold = 0.015f;
+    float g_MinDPVal = 0.9f;
     unsigned long long lastPickedId = 0;
+
+    __declspec (dllexport) void SetPlaneConstants(float minDist, float splitThreshold, float
+        minDPVal)
+    {
+        g_mindist = minDist;
+        g_splitThreshold = splitThreshold;
+        g_MinDPVal = minDPVal;
+    }
 
     struct Tile
     {
@@ -199,7 +209,7 @@ extern "C"
                     if (pt.IsValid())
                     {
                         float dp = fabs(Dot(pt - planePt, nrm1));
-                        if (dp > mindist)
+                        if (dp > g_mindist)
                         {
                             split = true;
                         }
@@ -210,7 +220,7 @@ extern "C"
             }
 
             maxDistFound /= numPts;
-            if (maxDistFound > 0.005)
+            if (maxDistFound > g_splitThreshold)
                 split = true;
 
             if (split)
@@ -491,16 +501,15 @@ extern "C"
             Result* other = itNeighbors.first;
 
             float dotNrm = Dot(pThis->normal, other->normal);
-            if ((dotNrm < -0.9 || dotNrm > 0.9) &&
-                Dot((pThis->pt0 - other->pt0), pThis->normal) < mindist)
+            if ((dotNrm < -g_MinDPVal || dotNrm > g_MinDPVal) &&
+                Dot((pThis->pt0 - other->pt0), pThis->normal) < g_mindist)
             {
                 FindConnected(itNeighbors.first, visitIdx, outTiles);
             }
         }
     }
 
-    __declspec (dllexport) void DepthMakePlanes(float* vals, Pt* outVertices, Pt* outTexCoords, int maxCount, int* outCount, 
-        int pickX, int pickY,
+    __declspec (dllexport) void DepthMakePlanes(float* vals, Pt* outVertices, Pt* outTexCoords, int maxCount, int* outCount,         
         int depthWidth, int depthHeight)
     {
         Buffer b;
@@ -519,14 +528,6 @@ extern "C"
             resultTiles.end();)
         {
             ResultPtr &res = *itRes;
-            if (pickX >= 0)
-            {
-                if (pickX >= res->r.x &&
-                    pickX < res->r.Right() &&
-                    pickY >= res->r.y &&
-                    pickY <= res->r.Bottom())
-                    res->isPicked = true;
-            }
             bool yorz = res->normal.y > res->normal.z;
             Pt xdir = Cross(res->normal, yorz ? Pt(0, 0, 1) : Pt(0, 1, 0));
             Pt ydir = Cross(xdir, res->normal);

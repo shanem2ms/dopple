@@ -39,6 +39,8 @@
             this.loadRcdBtn = new System.Windows.Forms.Button();
             this.frameProgress = new System.Windows.Forms.ProgressBar();
             this.panel1 = new System.Windows.Forms.Panel();
+            this.depthPtsCB = new System.Windows.Forms.CheckBox();
+            this.depthPlanesCB = new System.Windows.Forms.CheckBox();
             this.facePtCloudCB = new System.Windows.Forms.CheckBox();
             this.depthCB = new System.Windows.Forms.CheckBox();
             this.videoCB = new System.Windows.Forms.CheckBox();
@@ -89,7 +91,6 @@
             this.meshNameLbl = new System.Windows.Forms.Label();
             this.meshAlignLbl = new System.Windows.Forms.Label();
             this.dataPanel = new System.Windows.Forms.Panel();
-            this.depthPlanesCB = new System.Windows.Forms.CheckBox();
             label1 = new System.Windows.Forms.Label();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).BeginInit();
             this.splitContainer1.Panel2.SuspendLayout();
@@ -213,6 +214,7 @@
             // 
             // panel1
             // 
+            this.panel1.Controls.Add(this.depthPtsCB);
             this.panel1.Controls.Add(this.depthPlanesCB);
             this.panel1.Controls.Add(label1);
             this.panel1.Controls.Add(this.facePtCloudCB);
@@ -223,6 +225,26 @@
             this.panel1.Name = "panel1";
             this.panel1.Size = new System.Drawing.Size(320, 175);
             this.panel1.TabIndex = 12;
+            // 
+            // depthPtsCB
+            // 
+            this.depthPtsCB.AutoSize = true;
+            this.depthPtsCB.Location = new System.Drawing.Point(161, 76);
+            this.depthPtsCB.Name = "depthPtsCB";
+            this.depthPtsCB.Size = new System.Drawing.Size(127, 24);
+            this.depthPtsCB.TabIndex = 5;
+            this.depthPtsCB.Text = "Depth Points";
+            this.depthPtsCB.UseVisualStyleBackColor = true;
+            // 
+            // depthPlanesCB
+            // 
+            this.depthPlanesCB.AutoSize = true;
+            this.depthPlanesCB.Location = new System.Drawing.Point(161, 38);
+            this.depthPlanesCB.Name = "depthPlanesCB";
+            this.depthPlanesCB.Size = new System.Drawing.Size(131, 24);
+            this.depthPlanesCB.TabIndex = 4;
+            this.depthPlanesCB.Text = "Depth Planes";
+            this.depthPlanesCB.UseVisualStyleBackColor = true;
             // 
             // facePtCloudCB
             // 
@@ -291,7 +313,7 @@
             this.recordingPanel.Controls.Add(this.timeLabel);
             this.recordingPanel.Location = new System.Drawing.Point(331, 4);
             this.recordingPanel.Name = "recordingPanel";
-            this.recordingPanel.Size = new System.Drawing.Size(1963, 170);
+            this.recordingPanel.Size = new System.Drawing.Size(1963, 139);
             this.recordingPanel.TabIndex = 19;
             // 
             // meshDepthOffsetY
@@ -742,16 +764,6 @@
             this.dataPanel.TabIndex = 10;
             this.dataPanel.Visible = false;
             // 
-            // depthPlanesCB
-            // 
-            this.depthPlanesCB.AutoSize = true;
-            this.depthPlanesCB.Location = new System.Drawing.Point(161, 38);
-            this.depthPlanesCB.Name = "depthPlanesCB";
-            this.depthPlanesCB.Size = new System.Drawing.Size(131, 24);
-            this.depthPlanesCB.TabIndex = 4;
-            this.depthPlanesCB.Text = "Depth Planes";
-            this.depthPlanesCB.UseVisualStyleBackColor = true;
-            // 
             // MainWindow
             // 
             this.AutoScaleBaseSize = new System.Drawing.Size(8, 19);
@@ -853,5 +865,6 @@
         private System.Windows.Forms.TextBox alignStartFrmTB;
         private System.Windows.Forms.TextBox meshDepthOffsetY;
         private System.Windows.Forms.CheckBox depthPlanesCB;
+        private System.Windows.Forms.CheckBox depthPtsCB;
     }
 }

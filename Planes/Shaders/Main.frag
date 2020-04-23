@@ -10,5 +10,5 @@ void main()
 {
 	vec3 lightVec = normalize(vWsPos - lightPos);
 	float lit = abs(dot(lightVec, vNormal));
-	gl_FragColor = vec4(meshColor * (lit * (1 - ambient) + ambient), 1) * opacity;
+	gl_FragColor = vec4(vTexCoord * (lit * (1 - ambient) + ambient), 1) * opacity;
 }

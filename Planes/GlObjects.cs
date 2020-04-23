@@ -19,9 +19,9 @@ namespace GLObjects
     /// <summary>
     /// Shader object abstraction.
     /// </summary>
-    public class Object : IDisposable
+    public class Shader : IDisposable
     {
-        public Object(ShaderType shaderType, string source)
+        public Shader(ShaderType shaderType, string source)
         {
             if (source == null)
                 throw new ArgumentNullException(nameof(source));
@@ -74,9 +74,9 @@ namespace GLObjects
         {
             // Create vertex and frament shaders
             // Note: they can be disposed after linking to program; resources are freed when deleting the program
-            using (Object vObject = new Object(ShaderType.VertexShader, vertexSource))
-            using (Object fObject = new Object(ShaderType.FragmentShader, fragmentSource))
-            using (Object pObject = new Object(ShaderType.FragmentShader, pickSource))
+            using (Shader vObject = new Shader(ShaderType.VertexShader, vertexSource))
+            using (Shader fObject = new Shader(ShaderType.FragmentShader, fragmentSource))
+            using (Shader pObject = new Shader(ShaderType.FragmentShader, pickSource))
             {
                 data = new Data[2]
                 {
@@ -97,7 +97,7 @@ namespace GLObjects
             public Dictionary<string, int> shaderOffsets =
                 new Dictionary<string, int>();
 
-            public Data(Object vert, Object frag)
+            public Data(Shader vert, Shader frag)
             {
                 // Create program
                 pgm = GL.CreateProgram();
@@ -235,6 +235,8 @@ namespace GLObjects
     public class Texture : IDisposable
     {
         public readonly int TextureName;
+        public int Width { get; protected set; }
+        public int Height { get; protected set; }
 
         protected Texture()
         {
@@ -245,6 +247,8 @@ namespace GLObjects
         {
             GL.DeleteTexture(TextureName);
         }
+
+        public virtual void BindToIndex(int idx) { }
     }
 
     public class TextureFloat : Texture
@@ -254,6 +258,8 @@ namespace GLObjects
         }
         public void LoadDepthFrame(int width, int height, byte[] data)
         {
+            Width = width;
+            Height = height;
             GL.ActiveTexture(TextureUnit.Texture0);
             GL.BindTexture(TextureTarget.Texture2D, TextureName);
 
@@ -267,7 +273,7 @@ namespace GLObjects
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureBorderColor, new float[] { 0, 0, 0 });
         }
 
-        public void BindToIndex(int idx)
+        public override void BindToIndex(int idx)
         {
             GL.ActiveTexture(TextureUnit.Texture0 + idx);
             GL.BindTexture(TextureTarget.Texture2D, TextureName);
@@ -288,6 +294,8 @@ namespace GLObjects
 
         public void LoadData(int width, int height, IntPtr data)
         {
+            Width = width;
+            Height = height;
             GL.ActiveTexture(TextureUnit.Texture0);
             GL.BindTexture(TextureTarget.Texture2D, TextureName);
 
@@ -301,7 +309,42 @@ namespace GLObjects
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureBorderColor, new float[] { 0, 0, 0 });
         }
 
-        public void BindToIndex(int idx)
+        public override void BindToIndex(int idx)
+        {
+            GL.ActiveTexture(TextureUnit.Texture0 + idx);
+            GL.BindTexture(TextureTarget.Texture2D, TextureName);
+        }
+    }
+
+    public class TextureR8 : Texture
+    {
+        public TextureR8()
+        {
+        }
+
+        public void Create(int width, int height)
+        {
+            LoadData(width, height, null);
+        }
+
+        public void LoadData(int width, int height, byte []data)
+        {
+            Width = width;
+            Height = height;
+            GL.ActiveTexture(TextureUnit.Texture0);
+            GL.BindTexture(TextureTarget.Texture2D, TextureName);
+
+            GL.TexImage2D(TextureTarget2d.Texture2D, 0, TextureComponentCount.R8,
+                width, height, 0, PixelFormat.Red, PixelType.UnsignedByte,
+                data);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToBorder);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToBorder);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Nearest);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Nearest);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureBorderColor, new float[] { 0, 0, 0 });
+        }
+
+        public override void BindToIndex(int idx)
         {
             GL.ActiveTexture(TextureUnit.Texture0 + idx);
             GL.BindTexture(TextureTarget.Texture2D, TextureName);
@@ -338,6 +381,8 @@ namespace GLObjects
     public class FrameBuffer
     {
         public readonly int FrameBufferName;
+        int viewportW = 0;
+        int viewportH = 0;
         public FrameBuffer()
         {
             FrameBufferName = GL.GenFramebuffer();
@@ -349,6 +394,8 @@ namespace GLObjects
             GL.FramebufferRenderbuffer(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthAttachment,
                 RenderbufferTarget.Renderbuffer, db.RenderBufferName);
 
+            viewportW = textures[0].Width;
+            viewportH = textures[0].Height;
             DrawBufferMode[] drawBuffers = new DrawBufferMode[textures.Length];
             for (int i = 0; i < textures.Length; ++i)
             {
@@ -359,6 +406,59 @@ namespace GLObjects
 
             GL.DrawBuffers(textures.Length, drawBuffers);
             FramebufferErrorCode errorCode = GL.CheckFramebufferStatus(FramebufferTarget.Framebuffer);
+            FrameBuffer.BindNone();
+        }
+
+        public static void BindNone()
+        {
+            GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+            GL.Viewport(0, 0, mainViewportW, mainViewportH);
+        }
+
+        static int mainViewportW = 0;
+        static int mainViewportH = 0;
+        public static void SetViewPortSize(int width, int height)
+        {
+            mainViewportW = width;
+            mainViewportH = height;
+
+        }
+
+        public void Bind()
+        {
+            GL.BindFramebuffer(FramebufferTarget.Framebuffer, FrameBufferName);
+            GL.Viewport(0, 0, viewportW, viewportH);
+        }
+    }
+
+    public class RenderTarget
+    {
+        FrameBuffer fb;
+        TextureRgba tex;
+        DepthBuffer depth;
+
+        public Texture Tex => tex;
+
+        public RenderTarget(int width, int height)
+        {
+            tex = new TextureRgba();
+            tex.Create(width, height);
+            depth = new DepthBuffer();
+            depth.Create(width, height);
+            fb = new FrameBuffer();
+            fb.Create(new Texture[] { tex }, depth);
+        }
+
+        public void Use()
+        {
+            fb.Bind();
+            GL.Clear(ClearBufferMask.ColorBufferBit);
+            GL.Clear(ClearBufferMask.DepthBufferBit);
+        }
+
+        public void Draw(Vector4 offsetScl)
+        {
+            Registry.DrawRT(this, offsetScl);
         }
     }
 
@@ -399,10 +499,11 @@ namespace GLObjects
             GL.TexImage2D(TextureTarget2d.Texture2D, 0, TextureComponentCount.Rg8,
                 uvWidth, uvHeight, 0, PixelFormat.Rg, PixelType.UnsignedByte,
                 uvData);
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToBorder);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToBorder);
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureBorderColor, new float[] { 0, 0, 0 });
         }
 
         public void BindToIndex(int idx0, int idx1)
@@ -503,7 +604,6 @@ namespace GLObjects
             {
                 elementCount = elems.Length;
                 _BufferElems = new GLObjects.Buffer<uint>(elems);
-                GL.BindBuffer(BufferTarget.ElementArrayBuffer, _BufferElems.BufferName);
             }
 
             for (int i = 0; i < 2; ++i)
@@ -515,7 +615,8 @@ namespace GLObjects
                 program.Use(i);
 
                 GL.BindVertexArray(ArrayName[i]);
-                GL.BindBuffer(BufferTarget.ElementArrayBuffer, _BufferElems.BufferName);
+                if (_BufferElems != null)
+                    GL.BindBuffer(BufferTarget.ElementArrayBuffer, _BufferElems.BufferName);
 
                 // Select the buffer object
                 GL.BindBuffer(BufferTarget.ArrayBuffer, _BufferPosition.BufferName);
@@ -634,11 +735,46 @@ namespace GLObjects
         public static Dictionary<string, Program> Programs =
             new Dictionary<string, Program>();
 
+        public static VertexArray BltVA;
         static public void LoadAllPrograms()
         {
-            Programs.Add("mesh", Program.FromFiles("Main.vert", "Main.frag"));
-            Programs.Add("pick", Program.FromFiles("Pick.vert", "Pick.frag"));
-            Programs.Add("char", Program.FromFiles("Character.vert", "Character.frag"));
+            Programs.Add("main", Program.FromFiles("Main.vert", "Main.frag"));
+            Programs.Add("vid", Program.FromFiles("VidShader.vert", "VidShader.frag"));
+            Programs.Add("blt", Program.FromFiles("BltTex.vert", "BltTex.frag"));
+            BltVA = new VertexArray(Programs["blt"], _ArrayPosition, _ArrayElems, _ArrayTexCoord, null);
         }
+
+        private static readonly Vector3[] _ArrayPosition = new Vector3[] {
+            new Vector3(0.0f, 0.0f, 0.0f),
+            new Vector3(1.0f, 0.0f, 0.0f),
+            new Vector3(1.0f, 1.0f, 0.0f),
+            new Vector3(0.0f, 1.0f, 0.0f)
+        };
+
+        private static readonly ushort[] _ArrayElems = new ushort[]
+        {
+            0, 1, 2, 2, 3, 0,
+        };
+
+        /// <summary>
+        /// Vertex color array.
+        /// </summary>
+        private static readonly Vector3[] _ArrayTexCoord = new Vector3[] {
+            new Vector3(0.0f, 0.0f, 0.0f),
+            new Vector3(1.0f, 0.0f, 0.0f),
+            new Vector3(1.0f, 1.0f, 1.0f),
+            new Vector3(0.0f, 1.0f, 0.0f),
+        };
+
+        public static void DrawRT(RenderTarget rt, Vector4 sclOffset)
+        {
+            Program blt = Programs["blt"];
+            blt.Use(0);
+            blt.Set1("texSampler", (int)0);
+            rt.Tex.BindToIndex(0);
+            blt.Set4("offsetScale", sclOffset);
+            BltVA.Draw();
+        }
+
     }
 }

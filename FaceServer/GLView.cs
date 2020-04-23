@@ -18,11 +18,12 @@ namespace FaceServer
             eFaceMesh = 4,
             eCombinedFace = 16,
             eDepthPlanes = 32,
-            eAll = 63
+            eDepthPts = 64,
+            eAll = 127
         }
 
 
-        ViewMode viewMode = ViewMode.eCombinedFace;
+        ViewMode viewMode = ViewMode.eDepthPlanes;
         int currentFB;
         int selectionFB;
         int pickTexSize = 1024;
@@ -40,6 +41,7 @@ namespace FaceServer
             set
             {
                 this.viewMode = value;
+                this.depthPlaneVis.Mode = this.viewMode;
                 this.glControl.Invalidate();
             }
         }
@@ -66,7 +68,10 @@ namespace FaceServer
                 this.cameraTypeCB.Items.Add(name);
             }
 
-            this.cameraTypeCB.SelectedIndex = 1;
+            this.cameraTypeCB.SelectedIndex = 0;
+            this.planesMinSizeTB.Text = VideoFrame.PlaneMinSize.ToString();
+            this.planesThreshTB.Text = VideoFrame.PlaneThreshold.ToString();
+            this.planeDPMinTB.Text = VideoFrame.MinDPVal.ToString();
         }
         protected override void OnLoad(EventArgs e)
         {
@@ -435,6 +440,7 @@ namespace FaceServer
 
         VideoMesh videoMesh = null;
         CombinedFace combinedFace = null;
+        DepthPlanesVis depthPlaneVis = null;
         AlignmentVis alignmentVis = null;
         public ThreeDPointVis threedpointvis = null;
         Origin origin = null;
@@ -444,6 +450,7 @@ namespace FaceServer
         {
             videoMesh = new VideoMesh();
             combinedFace = new CombinedFace();
+            depthPlaneVis = new DepthPlanesVis();
             alignmentVis = new AlignmentVis();
             threedpointvis = new ThreeDPointVis();
             origin = new Origin();
@@ -464,7 +471,7 @@ namespace FaceServer
             }
             else
             {
-                viewProj = viewMat * projectionMat;
+                viewProj = viewMat * this.cameraProjectionMat;
             }
 
             if ((viewMode & ViewMode.eImage) != 0 ||
@@ -487,6 +494,12 @@ namespace FaceServer
             {
                 this.combinedFace.Render(viewProj, selectMode);
                 this.alignmentVis.Render(viewProj);
+            }
+
+            if ((viewMode & ViewMode.eDepthPlanes) != 0 ||
+                (viewMode & ViewMode.eDepthPts) != 0)
+            {
+                this.depthPlaneVis.Render(viewProj);
             }
 
             Matrix4 worldMat = Matrix4.CreateFromQuaternion(threeDRot.Val) *
@@ -524,8 +537,10 @@ namespace FaceServer
         }
         public void SetCurrentFrame(Frame f)
         {
+            
             this.videoMesh.CurrentFrame = f;
             this.origin.CurrentFrame = f;
+            this.depthPlaneVis.SetVideoFrame(f);
             this.glControl.Invalidate();
             if (!lockTransformToFirstFrame)
                 InitViewPos(f);
@@ -569,6 +584,27 @@ namespace FaceServer
                 this.activeTool = ActiveTool.PtMeshMove;
             else if (this.rotateBtn.Checked)
                 this.activeTool = ActiveTool.PtMeshRotate;
+        }
+
+        private void planesMinSizeTB_Leave(object sender, EventArgs e)
+        {
+            VideoFrame.PlaneMinSize = float.Parse(this.planesMinSizeTB.Text);
+            VideoFrame.RefreshConstant();
+            this.depthPlaneVis.Rebuild();
+        }
+
+        private void planesThreshTB_Leave(object sender, EventArgs e)
+        {
+            VideoFrame.PlaneThreshold = float.Parse(this.planesThreshTB.Text);
+            VideoFrame.RefreshConstant();
+            this.depthPlaneVis.Rebuild();
+        }
+
+        private void planeDPMinTB_Leave(object sender, EventArgs e)
+        {
+            VideoFrame.MinDPVal= float.Parse(this.planeDPMinTB.Text);
+            VideoFrame.RefreshConstant();
+            this.depthPlaneVis.Rebuild();
         }
     }
 }

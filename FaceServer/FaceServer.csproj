@@ -121,6 +121,7 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="AlignmentVis.cs" />
+    <Compile Include="DepthPlanesVis.cs" />
     <Compile Include="FaceMeshService.cs">
       <SubType>Code</SubType>
     </Compile>

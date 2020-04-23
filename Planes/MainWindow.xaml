@@ -24,6 +24,8 @@
                 <Label Grid.Column="1" Content="{Binding Name}" />
                 <Label Margin="5" Grid.Row="1" Content="Frame" />
                 <StackPanel Grid.Column="1" Grid.Row="1" Orientation="Horizontal" >
+                    <Button Content="P" Click="Back_Clicked" />
+                    <Button Content="N" Click="Next_Clicked" />
                     <Label Content="0" Margin="5"/>
                     <Slider Maximum="{Binding NumFrames}" Minimum="1" MinWidth="200"
                         HorizontalAlignment="Left" TickPlacement="Both" TickFrequency="10" SmallChange="1"
@@ -32,7 +34,7 @@
                     <Label Content="Current Frame" Margin="10,5,5,5"/>
                     <TextBox Text="{Binding Path=CurrentFrameIdx, UpdateSourceTrigger=LostFocus}" Margin="5" />
                 </StackPanel>
-                
+
             </Grid>
         </DataTemplate>
     </Window.Resources>
@@ -50,6 +52,14 @@
         <WindowsFormsHost x:Name="HostControl" Margin="0,0,0,0" Grid.Row="1" Grid.Column="1" >
             <opentk:GLControl x:Name="glControl" Resize="glControl_Resize" />
         </WindowsFormsHost>
+        <StackPanel DataContext="{Binding Path=Settings}" Orientation="Vertical" Grid.Row="1" Grid.Column="0">
+            <Label Content="PlaneMinSize" />
+            <TextBox Text="{Binding Path=PlaneMinSize, UpdateSourceTrigger=LostFocus}"/>
+            <Label Content="PlaneThreshold" />
+            <TextBox Text="{Binding Path=PlaneThreshold, UpdateSourceTrigger=LostFocus}"/>
+            <Label Content="MinDPVal" />
+            <TextBox Text="{Binding Path=MinDPVal, UpdateSourceTrigger=LostFocus}"/>
+        </StackPanel>
         <ContentControl Margin="10" Grid.Row="2" Grid.Column="1" Content="{Binding ActiveRecording}" />
     </Grid>
 </Window>

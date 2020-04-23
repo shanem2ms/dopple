@@ -107,13 +107,24 @@ namespace Dopple
         public static extern void DepthFindNormals(IntPtr pDepthPts, IntPtr pOutNormals, int ptx, int pty, int depthWidth, int depthHeight);
 
         [DllImport("ptslib.dll")]
+        public static extern void SetPlaneConstants(float minDist, float splitThreshold, float minDPVal);
+        
+        [DllImport("ptslib.dll")]
         public static extern void DepthMakePlanes(IntPtr pDepthPts, IntPtr pOutVertices, IntPtr pOutTexCoords, int numVertices, out int vertexCnt,
-            int px, int py, int depthWidth, int depthHeight);
+            int depthWidth, int depthHeight);
 
         [DllImport("msvcrt.dll", EntryPoint = "memcpy",
         CallingConvention = CallingConvention.Cdecl, SetLastError = false)]
         public static extern IntPtr memcpy(IntPtr dest, IntPtr src, UIntPtr count);
 
+        public static float PlaneMinSize = 0.05f;
+        public static float PlaneThreshold = 0.015f;
+        public static float MinDPVal = 0.9f;
+
+        public static void RefreshConstant()
+        {
+            SetPlaneConstants(PlaneMinSize, PlaneThreshold, MinDPVal);
+        }
 
         private Vector3[] depthQuads = null;
         private Vector3[] depthTexColors = null;
@@ -124,7 +135,7 @@ namespace Dopple
         int genCount;
 
 
-        Vector3 []GetDepthPoints()
+        public Vector3 []GetDepthPoints()
         {
             int depthHeight = DepthHeight;
             int depthWidth = DepthWidth;
@@ -136,6 +147,7 @@ namespace Dopple
 
             System.Buffer.BlockCopy(depthData, 0, vals,
                 0, depthHeight * depthWidth * 4);
+
             Array.Copy(vals, valsdx, vals.Length);
             Array.Copy(vals, valsdy, vals.Length);
 
@@ -161,29 +173,13 @@ namespace Dopple
             {
                 for (int x = 0; x < depthWidth; ++x)
                 {
-                    int dx = (int)(((x - depthWidth / 2) + dOffsetX) * dSclX) +
-                        depthWidth / 2;
-                    int dy = (int)(((y - depthHeight / 2) + dOffsetY) * dSclY) +
-                        depthHeight / 2;
-
-
-                    float depthVal = float.NaN;
-                    if (dx >= 0 && dx < depthWidth &&
-                        dy >= 0 && dy < depthHeight)
-                        depthVal = vals[dy * depthWidth + dx];
-                    if (!float.IsNaN(depthVal) && depthVal < 1)
+                    float depthVal = vals[y * depthWidth + x];
+                    if (!float.IsNaN(depthVal))
                     {
                         float xrw = (x - xOff) * depthVal / xScl;
                         float yrw = (y - yOff) * depthVal / yScl;
                         Vector4 viewPos = new Vector4(xrw, yrw, depthVal, 1);
                         Vector4 modelPos = viewPos * matTransform;
-
-                        float depthdx = valsdx[dy * depthWidth + dx];
-                        float depthdy = valsdy[dy * depthWidth + dx];
-                        Vector3 vector4Normal = new Vector3(depthdx / xScl * 10,
-                            depthdy / yScl * 10, depthVal);
-                        vector4Normal.Normalize();
-                        Vector3 modelNrm = Vector3.TransformNormal(vector4Normal, matTransform);
                         pos.Add(new Vector3(modelPos.X, modelPos.Y, modelPos.Z));
                     }
                     else
@@ -192,12 +188,19 @@ namespace Dopple
                     }  
                 }
             }
-
             return pos.ToArray();
         }
+        void CopyToVector(float[] floats, Vector3[] vectors)
+        {
+            for (int vecIdx = 0; vecIdx < vectors.Length; ++vecIdx)
+            {
+                vectors[vecIdx].X = floats[vecIdx * 3];
+                vectors[vecIdx].Y = floats[vecIdx * 3 + 1];
+                vectors[vecIdx].Z = floats[vecIdx * 3 + 2];
+            }
+        }
 
-
-        public void MakePlanes()
+        public void MakePlanes(out Vector3[] outPts, out Vector3[] outTex, out int cnt)
         {
             int bytesPerFrame = DepthStride * DepthHeight * 3;
             this.depthQuads = new Vector3[DepthWidth * DepthHeight * 6];
@@ -208,23 +211,35 @@ namespace Dopple
 
             Vector3[] pts = GetDepthPoints();
             int v3size = Marshal.SizeOf(pts[0]);
+            float[] fpts = new float[pts.Length * 3];
             for (int idx = 0; idx < pts.Length; ++idx)
             {
-                Marshal.StructureToPtr(pts[idx], depthPtsPtr + idx * v3size, false);
+                fpts[idx * 3] = pts[idx].X;
+                fpts[idx * 3 + 1] = pts[idx].Y;
+                fpts[idx * 3 + 2] = pts[idx].Z;
             }
+            Marshal.Copy(fpts, 0, depthPtsPtr, fpts.Length);
             DepthFindNormals(depthPtsPtr, depthNrmPtr, 0, 0, DepthWidth, DepthHeight);
             DepthMakePlanes(depthPtsPtr, genVerticesPtr, genTexCoordsPtr, depthQuads.Length, out genCount,
-                0, 0, DepthWidth, DepthHeight);
+                DepthWidth, DepthHeight);
 
-            Vector3 []quadPts = new Vector3[depthQuads.Length];
-            for (int idx = 0; idx < depthQuads.Length; ++idx)
-            {
-                quadPts[idx] = (Vector3)Marshal.PtrToStructure(genVerticesPtr + idx * 12, typeof(Vector3));                
-            }
+            cnt = genCount;
+            float []outPtsf = new float[depthQuads.Length * 3];
+            Marshal.Copy(genVerticesPtr, outPtsf, 0, outPtsf.Length);
+            outPts = new Vector3[depthQuads.Length];
+            CopyToVector(outPtsf, outPts);
+
+            float[] outTexf = new float[depthQuads.Length * 3];
+            outTex = new Vector3[depthQuads.Length];
+            Marshal.Copy(genTexCoordsPtr, outTexf, 0, outTexf.Length);
+            outTex = new Vector3[depthQuads.Length];
+            CopyToVector(outTexf, outTex);
+
             Marshal.FreeHGlobal(depthPtsPtr);
             Marshal.FreeHGlobal(depthNrmPtr);
             Marshal.FreeHGlobal(genVerticesPtr);
             Marshal.FreeHGlobal(genTexCoordsPtr);
+            
         }
 
         public Vector3 GetRGBVal(int ix, int iy)

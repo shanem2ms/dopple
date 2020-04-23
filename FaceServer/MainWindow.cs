@@ -132,8 +132,10 @@ namespace FaceServer
             this.DoubleBuffered = true;
             this.videoCB.CheckedChanged += new System.EventHandler(this.visibleLayers_CheckedChanged);
             this.depthCB.CheckedChanged += new System.EventHandler(this.visibleLayers_CheckedChanged);
+            this.depthPlanesCB.CheckedChanged += new System.EventHandler(this.visibleLayers_CheckedChanged);
             this.facePtCloudCB.CheckedChanged += new System.EventHandler(this.visibleLayers_CheckedChanged);
             this.wholeFaceCB.CheckedChanged += new System.EventHandler(this.visibleLayers_CheckedChanged);
+            this.depthPtsCB.CheckedChanged += new System.EventHandler(this.visibleLayers_CheckedChanged);
             RefreshViewCtrls();
 
             foreach (string meshModeName in Enum.GetNames(typeof(MeshMode)))
@@ -839,7 +841,8 @@ namespace FaceServer
                 (this.videoCB.Checked ? GLView.ViewMode.eImage : 0) |
                 (this.depthCB.Checked ? GLView.ViewMode.eDepth : 0) |                
                 (this.wholeFaceCB.Checked ? GLView.ViewMode.eCombinedFace : 0) |
-                (this.depthPlanesCB.Checked ? GLView.ViewMode.eDepthPlanes : 0);
+                (this.depthPlanesCB.Checked ? GLView.ViewMode.eDepthPlanes : 0) |
+                (this.depthPtsCB.Checked ? GLView.ViewMode.eDepthPts : 0);
         }
 
         private void LoadMeshBtn_Click(object sender, EventArgs e)

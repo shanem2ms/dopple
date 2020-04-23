@@ -40,6 +40,9 @@
             this.translateBtn = new System.Windows.Forms.RadioButton();
             this.selectToolBtn = new System.Windows.Forms.RadioButton();
             this.alignStepBtn = new System.Windows.Forms.Button();
+            this.planesMinSizeTB = new System.Windows.Forms.TextBox();
+            this.planesThreshTB = new System.Windows.Forms.TextBox();
+            this.planeDPMinTB = new System.Windows.Forms.TextBox();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).BeginInit();
             this.splitContainer1.Panel1.SuspendLayout();
             this.splitContainer1.Panel2.SuspendLayout();
@@ -128,6 +131,9 @@
             // 
             // splitContainer1.Panel2
             // 
+            this.splitContainer1.Panel2.Controls.Add(this.planeDPMinTB);
+            this.splitContainer1.Panel2.Controls.Add(this.planesMinSizeTB);
+            this.splitContainer1.Panel2.Controls.Add(this.planesThreshTB);
             this.splitContainer1.Panel2.Controls.Add(this.rotateBtn);
             this.splitContainer1.Panel2.Controls.Add(this.translateBtn);
             this.splitContainer1.Panel2.Controls.Add(this.selectToolBtn);
@@ -195,6 +201,30 @@
             this.alignStepBtn.UseVisualStyleBackColor = true;
             this.alignStepBtn.Click += new System.EventHandler(this.AlignStepBtn_Click);
             // 
+            // planesMinSizeTB
+            // 
+            this.planesMinSizeTB.Location = new System.Drawing.Point(425, 59);
+            this.planesMinSizeTB.Name = "planesMinSizeTB";
+            this.planesMinSizeTB.Size = new System.Drawing.Size(100, 26);
+            this.planesMinSizeTB.TabIndex = 44;
+            this.planesMinSizeTB.Leave += new System.EventHandler(this.planesMinSizeTB_Leave);
+            // 
+            // planesThreshTB
+            // 
+            this.planesThreshTB.Location = new System.Drawing.Point(425, 109);
+            this.planesThreshTB.Name = "planesThreshTB";
+            this.planesThreshTB.Size = new System.Drawing.Size(100, 26);
+            this.planesThreshTB.TabIndex = 43;
+            this.planesThreshTB.Leave += new System.EventHandler(this.planesThreshTB_Leave);
+            // 
+            // planeDPMinTB
+            // 
+            this.planeDPMinTB.Location = new System.Drawing.Point(425, 179);
+            this.planeDPMinTB.Name = "planeDPMinTB";
+            this.planeDPMinTB.Size = new System.Drawing.Size(100, 26);
+            this.planeDPMinTB.TabIndex = 45;
+            this.planeDPMinTB.Leave += new System.EventHandler(this.planeDPMinTB_Leave);
+            // 
             // GLView
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 20F);
@@ -225,5 +255,8 @@
         private System.Windows.Forms.RadioButton rotateBtn;
         private System.Windows.Forms.RadioButton translateBtn;
         private System.Windows.Forms.RadioButton selectToolBtn;
+        private System.Windows.Forms.TextBox planesMinSizeTB;
+        private System.Windows.Forms.TextBox planesThreshTB;
+        private System.Windows.Forms.TextBox planeDPMinTB;
     }
 }
