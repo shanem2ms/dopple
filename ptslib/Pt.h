@@ -59,7 +59,7 @@ struct Pt
 
     inline bool IsValid()
     {
-        return !isinf(x) && (x != 0 && y != 0 && x != 0);
+        return !isinf(x) && (x != 0 || y != 0 || z != 0);
     }
 
     float Length()

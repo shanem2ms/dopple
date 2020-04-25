@@ -43,6 +43,8 @@ namespace Planes
         float planeThreshold = 0.045f;
         float minDPVal = 0.9f;
 
+        public event EventHandler<EventArgs> OnSettingsChanged;
+
         public float PlaneMinSize { get => planeMinSize; set { planeMinSize = value; Refresh(); } }
         public float PlaneThreshold { get => planeThreshold; set { planeThreshold = value; Refresh(); } }
         public float MinDPVal { get => minDPVal; set { minDPVal = value; Refresh(); } }
@@ -50,6 +52,7 @@ namespace Planes
         void Refresh()
         {
             Dopple.VideoFrame.RefreshConstant();
+            OnSettingsChanged?.Invoke(this, new EventArgs());
         }
     }
 }

@@ -60,6 +60,7 @@ namespace Planes
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            Dopple.VideoFrame.RefreshConstant();
             glControl.Paint += GlControl_Paint;
             glControl.MouseDown += GlControl_MouseDown;
             glControl.MouseMove += GlControl_MouseMove;

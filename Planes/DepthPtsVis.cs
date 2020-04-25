@@ -27,6 +27,12 @@ namespace Planes
             frameOffset = _frameOffset;
             _Program = Registry.Programs["main"];
             App.Recording.OnFrameChanged += Recording_OnFrameChanged;
+            App.Settings.OnSettingsChanged += Settings_OnSettingsChanged;
+            LoadVideoFrame();
+        }
+
+        private void Settings_OnSettingsChanged(object sender, EventArgs e)
+        {
             LoadVideoFrame();
         }
 
