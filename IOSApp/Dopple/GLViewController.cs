@@ -1,5 +1,5 @@
 ﻿using System;
-using AVFoundation;
+using System.Runtime.InteropServices;
 using Foundation;
 using UIKit;
 using CoreVideo;
@@ -15,6 +15,11 @@ using OpenTK;
 
 namespace Dopple
 {
+    public class Lib
+    {
+        [DllImport("__Internal")]
+        public static extern void SetPlaneConstants(float minDist, float splitThreshold, float minDPVal);
+    }
     public partial class GLViewController : GLKViewController
     {
         #region Constructors

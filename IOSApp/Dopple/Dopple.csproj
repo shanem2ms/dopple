@@ -28,11 +28,14 @@
     <MtouchArch>x86_64</MtouchArch>
     <MtouchHttpClientHandler>NSUrlSessionHandler</MtouchHttpClientHandler>
     <PlatformTarget>x86</PlatformTarget>
+<MtouchExtraArgs>-cxx -gcc_flags "-L${ProjectDir} -lptslibios -force_load ${ProjectDir}/libptslibios.a"</MtouchExtraArgs>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|iPhone' ">
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
     <OutputPath>bin\iPhone\Release</OutputPath>
+    <DefineConstants></DefineConstants>
+    <DefineConstants></DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <CodesignKey>iPhone Developer</CodesignKey>
@@ -46,8 +49,11 @@
     </MtouchUseThumb>
     <CrashReportingApiKey>
     </CrashReportingApiKey>
-    <AssemblyName>Dopple</AssemblyName>
     <MtouchDebug>false</MtouchDebug>
+    <IpaIncludeArtwork></IpaIncludeArtwork>
+    <IpaPackageName></IpaPackageName>
+    <SignAssembly>false</SignAssembly>
+    <DelaySign>false</DelaySign>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|iPhoneSimulator' ">
     <DebugType>pdbonly</DebugType>
@@ -83,7 +89,7 @@
     <MtouchArch>ARM64</MtouchArch>
     <MtouchHttpClientHandler>NSUrlSessionHandler</MtouchHttpClientHandler>
     <PlatformTarget>x86</PlatformTarget>
-    <AssemblyName>Dopple</AssemblyName>
+    <MtouchExtraArgs>-cxx -gcc_flags "-L${ProjectDir} -lptslibios -force_load ${ProjectDir}/libptslibios.a"</MtouchExtraArgs>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'ReleaseNoOpt|iPhoneSimulator'">
     <OutputPath>bin\iPhoneSimulator\ReleaseNoOpt\</OutputPath>
@@ -138,6 +144,7 @@
     <Content Include="Shaders\FaceMesh.vert" />
     <Content Include="Shaders\DualEye.frag" />
     <Content Include="Shaders\DualEye.vert" />
+    <None Include="libptslibios.a" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="DualEyeViewController.cs" />
