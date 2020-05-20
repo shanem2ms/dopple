@@ -6,6 +6,13 @@ using System.Runtime.InteropServices;
 using OpenCvSharp;
 using OpenCvSharp.XFeatures2D;
 using OpenTK;
+using System.Threading;
+using Dopple;
+using System.Runtime.ExceptionServices;
+using System.Windows.Forms;
+using System.Diagnostics;
+using System.Windows.Markup;
+using System.Runtime.CompilerServices;
 
 namespace Planes
 {
@@ -13,6 +20,9 @@ namespace Planes
     {
         [DllImport("ptslib.dll")]
         public static extern IntPtr CreatePtCloudAlign(IntPtr m_pts0, uint ptCount0, IntPtr m_pts1, uint ptCount1);
+
+        [DllImport("ptslib.dll")]
+        public static extern int GetNearest(IntPtr pts0, uint ptCount0, IntPtr pts1, uint ptCount1, IntPtr outMatches);
 
         [DllImport("ptslib.dll")]
         public static extern int AlignStep(IntPtr aligner, IntPtr outmatrix);
@@ -65,149 +75,251 @@ namespace Planes
 
     public class OpenCV
     {
-        public class Match
+        public class Tracked
         {
-            public float dist3d;
-            public float dist2d;
-            public Vector2[] pts;
-            public Vector3[] wspts;
+            public int startFrame;
+            public List<Feature> features = new List<Feature>();
             public Vector3 color;
         }
 
-        public List<Match> ActiveMatches;
+        public class Feature
+        {
+            public Feature(int frame) { frameIdx = frame; }
+            public int frameIdx;
+            public Vector2 pt;
+            public Feature prev = null;
+            public Feature next = null;
+            public Vector3 color;
+            public float dist;
+        }
+
+        public class Features
+        {
+            public KeyPoint[] keypoints;
+            public Feature[] features;
+            public Mat descriptors;
+        }
+
+        public List<Tracked> []FrameTracked;
+
+        public Features[] FrameFeatures;
+
+        SURF detector;
+        BriefDescriptorExtractor extractor;
+        BFMatcher matcher;
+        public static Vector3[] Palette = new Vector3[64];
 
         public OpenCV()
         {
+            this.detector = SURF.Create(hessianThreshold: 4000);
+            this.extractor = BriefDescriptorExtractor.Create();
+            this.matcher = new BFMatcher();
             App.Recording.OnFrameChanged += Recording_OnFrameChanged;
-            LoadFrame(App.FrameDelta);
+            Random r = new Random();
+            for (int i = 0; i < Palette.Length; ++i)
+            {
+                Palette[i] = new Vector3((float)r.NextDouble(),
+                    (float)r.NextDouble(), (float)r.NextDouble());
+                float maxVal = Math.Max(Math.Max(Palette[i].X, Palette[i].Y), Palette[i].Z);
+                Palette[i] /= maxVal;
+            }
+            LoadFrame();
         }
 
         private void Recording_OnFrameChanged(object sender, int e)
         {
-            //LoadFrame(App.FrameDelta);
+            LoadFrame();
+        }
+        public class TrackedPt
+        {
+            public Vector2 pt;
+            public Vector3 col;
         }
 
-        void LoadFrame(int delta)
+
+        int nextFrameToProcess = 0;
+        int framesCompleted = 0;
+        AutoResetEvent frameCompletedEvt = new AutoResetEvent(false);
+        void ProcessFrame(object o)
         {
-            int frameIdx = App.Recording.CurrentFrameIdx;
-            if (frameIdx >= App.Recording.NumFrames - delta)
-                return;
-            Dopple.VideoFrame vf1 = App.Recording.Frames[frameIdx].vf;
-            Dopple.VideoFrame vf2 = App.Recording.Frames[frameIdx + delta].vf;
-            Mat img1 = MatFromVidFrame(vf1);
-            Mat img2 = MatFromVidFrame(vf2);
-            var detector = SURF.Create(hessianThreshold: 4000);
-            var keypoints1 = detector.Detect(img1);
-            var keypoints2 = detector.Detect(img2);
-            var extractor = BriefDescriptorExtractor.Create();
-
-            var descriptors1 = new Mat();
-            var descriptors2 = new Mat();
-            extractor.Compute(img1, ref keypoints1, descriptors1);
-            extractor.Compute(img2, ref keypoints2, descriptors2);
-
-            // matching descriptors
-            var matcher = new BFMatcher();
-            var matches = matcher.KnnMatch(descriptors1, descriptors2, 2);
-            var distMatches = matches.Where(m => m.Length > 1 && m[0].Distance * 2 < m[1].Distance).Select(m => m[0]);
-            if (distMatches == null)
-                return;
-            Point2f[] pts1 = new Point2f[distMatches.Count()];
-            Point2f[] pts2 = new Point2f[distMatches.Count()];
-
-            ActiveMatches = new List<Match>(distMatches.Count());
-            int idx = 0;
-            float invWidth = 1.0f / vf1.ImageWidth * vf1.DepthWidth;
-            float invHeight = 1.0f / vf1.ImageHeight * vf1.DepthHeight;
-
-            var ptsDict1 = vf1.DepthPts;
-            var ptsDict2 = vf2.DepthPts;
-            Random r = new Random();
-            foreach (var m in distMatches)
+            while (true)
             {
-                var p1 = keypoints1[m.QueryIdx].Pt;
-                var p2 = keypoints2[m.TrainIdx].Pt;
+                int frameIdx = Interlocked.Increment(ref nextFrameToProcess) - 1;
+                if (frameIdx >= App.Recording.NumFrames)
+                    break;
+                Dopple.VideoFrame vf1 = App.Recording.Frames[frameIdx].vf;
+                Mat img1 = MatFromVidFrame(vf1);
+                Features features = new Features();
+                features.keypoints = detector.Detect(img1);
+                features.descriptors = new Mat();
+                features.features = new Feature[features.keypoints.Length];
+                float invW = 1.0f / vf1.imageWidth;
+                float invH = 1.0f / vf1.imageHeight;
 
-                int d1x = (int)(p1.X * invHeight);
-                int d1y = (int)(p1.Y * invWidth);
-                int d2x = (int)(p2.X * invHeight);
-                int d2y = (int)(p2.Y * invWidth);
-
-                int offset = d1x * vf1.DepthWidth + d1y;
-                if (ptsDict1.ContainsKey(offset) &&
-                    ptsDict2.ContainsKey(offset) &&
-                    ptsDict1[offset].pt.Z > -5 &&
-                    ptsDict2[offset].pt.Z > -5)
+                for (int idx = 0; idx < features.features.Length; ++idx)
                 {
-                    ActiveMatches.Add(
-                        new Match()
+                    features.features[idx] = new Feature(frameIdx);
+                    features.features[idx].pt = new Vector2(features.keypoints[idx].Pt.Y * invW,
+                        features.keypoints[idx].Pt.X * invH);
+                }
+                extractor.Compute(img1, ref features.keypoints, features.descriptors);
+                this.FrameFeatures[frameIdx] = features;
+                Interlocked.Increment(ref framesCompleted);
+                frameCompletedEvt.Set();
+            }
+        }
+
+        AutoResetEvent matchesReadyForFrame = new AutoResetEvent(false);
+        void LoadFrame()
+        {
+            if (FrameFeatures == null)
+            {
+                FrameFeatures = new Features[App.Recording.NumFrames];
+
+                Thread[] threads = new Thread[28];
+                for (int idx = 0; idx < threads.Length; ++idx)
+                {
+                    threads[idx] = new Thread(new ParameterizedThreadStart(ProcessFrame));
+                    threads[idx].Start();
+                }
+
+                matchesReadyForFrame.Reset();
+                Thread fmThread = new Thread(new ParameterizedThreadStart(FindMatches));
+                fmThread.Start();
+                matchesReadyForFrame.WaitOne();
+            }
+        }
+
+        void FindMatches(object o)
+        {
+            for (int frameIdx = 0; frameIdx < this.FrameFeatures.Length - 1; ++frameIdx)
+            {
+                while ((this.FrameFeatures[frameIdx] == null ||
+                    this.FrameFeatures[frameIdx + 1] == null) &&
+                    framesCompleted < App.Recording.NumFrames)
+                    frameCompletedEvt.WaitOne();
+
+                if (this.FrameFeatures[frameIdx] != null &&
+                    this.FrameFeatures[frameIdx + 1] != null)
+                {
+                    Features f0 = this.FrameFeatures[frameIdx];
+                    Features f1 = this.FrameFeatures[frameIdx + 1];
+                    var matches = matcher.KnnMatch(f0.descriptors, f1.descriptors, 2);
+
+                    var singleMatches = matches.Where(m => m.Length == 1).ToList();
+                    var otherMatches = matches.Where(m => m.Length > 1).OrderBy(m => m[0].Distance / m[1].Distance).ToList();
+
+                    var bestMatches = singleMatches.Select(m => m[0]).Concat(otherMatches.Select(m => m[0])).ToList();
+
+                    List<Point2f> mpts0 = new List<Point2f>();
+                    List<Point2f> mpts1 = new List<Point2f>();
+
+                    List<Tuple<float, int>> distances = new List<Tuple<float, int>>();
+                    foreach (var m in bestMatches)
+                    {
+                        Vector2 p0 = f0.features[m.QueryIdx].pt;
+                        mpts0.Add(new Point2f(p0.X, p0.Y));
+                        Vector2 p1 = f1.features[m.TrainIdx].pt;
+                        mpts1.Add(new Point2f(p1.X, p1.Y));
+
+                        float dist = (f0.features[m.QueryIdx].pt - f1.features[m.TrainIdx].pt).Length;
+                        distances.Add(new Tuple<float, int>(dist, m.QueryIdx));
+                        f0.features[m.QueryIdx].next = f1.features[m.TrainIdx];
+                        f1.features[m.TrainIdx].prev = f0.features[m.QueryIdx];
+                    }
+
+                    distances.Sort((a, b) => { return a.Item1.CompareTo(b.Item1); });
+
+                    float tot = distances.Count;
+                    int didx = 0;
+                    foreach (var d in distances)
+                    {
+                        f0.features[d.Item2].dist = (float)(didx++) / tot;
+                    }
+
+                    /*
+                    List<byte> outliers = new List<byte>(mpts1.Count);
+                    OutputArray outputArray = OutputArray.Create(outliers);
+                    Cv2.FindHomography(InputArray.Create(mpts0), InputArray.Create(mpts1), HomographyMethods.Ransac,
+                        1, outputArray);
+
+                    int midx = 0;
+                    int outt = 0;
+                    foreach (var m in bestMatches)
+                    {
+                        if (outliers[midx] == 1)
                         {
-                            pts = new Vector2[2] { new Vector2(p1.X, p1.Y),
-                                new Vector2(p2.X, p2.Y) },
-                            wspts = new Vector3[2]
-                            {
-                                ptsDict1[offset].pt,
-                                ptsDict2[offset].pt
-                            },
-                            dist2d = (new Vector2(p1.X, p1.Y) - new Vector2(p2.X, p2.Y)).Length,
-                            dist3d = (ptsDict1[offset].pt - ptsDict2[offset].pt).Length,
-                            color = new Vector3(0.5f + (float)r.NextDouble() * 0.5f,
-                                    0.5f + (float)r.NextDouble() * 0.5f,
-                                    0.5f + (float)r.NextDouble() * 0.5f)
-                        });
+                            f0.features[m.QueryIdx].next = f1.features[m.TrainIdx];
+                            f1.features[m.TrainIdx].prev = f0.features[m.QueryIdx];
+                        }
+                        else
+                        {
+                            outt++;
+                        }
+                        midx++;
+                    }
+
+                    Debug.WriteLine($"{outt} / {bestMatches.Count}");*/
+                    /*
+                    Vector3 c0 = new Vector3(1, 0, 0);
+                    Vector3 c1 = new Vector3(0, 0, 1);
+                    foreach (var m in bestMatches)
+                    {
+                        float dist = (f0.features[m.QueryIdx].pt - f1.features[m.TrainIdx].pt).Length;
+                    }*/
+                }
+
+                if (frameIdx == App.Recording.CurrentFrameIdx)
+                    matchesReadyForFrame.Set();
+            }
+
+
+            List<Tracked> allTracked = new List<Tracked>();
+            int colIdx = 0;
+            for (int frameIdx = 0; frameIdx < this.FrameFeatures.Length - 1; ++frameIdx)
+            {
+                Features f0 = this.FrameFeatures[frameIdx];
+                foreach (var f in f0.features)
+                {
+                    if (f.prev == null && f.next != null)
+                    {
+                        List<Feature> features = new List<Feature>();
+                        Feature cf = f;
+                        float maxDist = 0;
+                        while (cf != null)
+                        {
+                            features.Add(cf);
+                            if (cf.next != null)
+                                maxDist = Math.Max(maxDist, (cf.next.pt - cf.pt).Length);
+                            cf = cf.next;                            
+                        }
+                        if (features.Count >= 5)
+                        {
+                            Tracked tracked = new Tracked();
+                            tracked.color = Palette[(colIdx++) % 64];
+                            tracked.startFrame = frameIdx;
+                            tracked.features = features;
+                            allTracked.Add(tracked);
+                        }
+                    }
                 }
             }
 
-            Vector3[] v0 = new Vector3[ActiveMatches.Count];
-            Vector3[] v1 = new Vector3[v0.Length];
-            IntPtr v1Ptr = Marshal.AllocHGlobal(v0.Length * 3 * sizeof(float));
-            IntPtr v2Ptr = Marshal.AllocHGlobal(v1.Length * 3 * sizeof(float));
-            IntPtr translatePtr = Marshal.AllocHGlobal(sizeof(float) * 3);
-            IntPtr rotatePtr = Marshal.AllocHGlobal(sizeof(float) * 4);
-
-            float totalLen = 0;
-            for (int i = 0; i < v0.Length; ++i)
+            FrameTracked = new List<Tracked>[App.Recording.NumFrames];
+            for (int frameIdx = 0; frameIdx < this.FrameFeatures.Length; ++frameIdx)
             {
-                Vector3 vp0 = ActiveMatches[i].wspts[0];
-                Vector3 vp1 = ActiveMatches[i].wspts[1];
-                vp0.Z = (vp0.Z + vp1.Z) * 0.5f;
-                vp1.Z = vp0.Z;
-                v0[i] = vp0;
-                v1[i] = vp1;
-                totalLen += (vp1 - vp0).Length;
+                FrameTracked[frameIdx] = new List<Tracked>();
             }
 
-            DPEngine.CopyVec3Array(v0, v1Ptr);
-            DPEngine.CopyVec3Array(v1, v2Ptr);
-            DPEngine.BestFit(v1Ptr, (uint)v0.Length, v2Ptr, (uint)v1.Length, translatePtr,
-                rotatePtr);
-            Vector3 translate = (Vector3)Marshal.PtrToStructure(translatePtr, typeof(Vector3));
-            Vector4 rotate = (Vector4)Marshal.PtrToStructure(rotatePtr, typeof(Vector4));
-
-            Vector3 axis = new Vector3(rotate).Normalized();
-            float angle = rotate.W;
-            Matrix4 mat =
-                Matrix4.CreateFromQuaternion(Quaternion.FromAxisAngle(axis, angle)) * 
-                Matrix4.CreateTranslation(new Vector3(translate));
-
-            float betterLen = 0;
-            for (int i = 0; i < v0.Length; ++i)
+            foreach (Tracked t in allTracked)
             {
-                Vector3 v0b = Vector3.TransformPosition(v0[i], mat);
-                betterLen += (v0b - v1[i]).Length;
-            }
-
-            Marshal.FreeHGlobal(translatePtr);
-            Marshal.FreeHGlobal(rotatePtr);
-            Marshal.FreeHGlobal(v1Ptr);
-            Marshal.FreeHGlobal(v2Ptr);
-            if (false)
-            {
-                var imgMatches = new Mat();
-                Cv2.DrawMatches(img1, keypoints1, img2, keypoints2, distMatches, imgMatches);
-                Cv2.ImShow("source", imgMatches);
+                foreach (var f in t.features)
+                {
+                    FrameTracked[f.frameIdx].Add(t);
+                }
             }
         }
+
 
         static Mat MatFromVidFrame(Dopple.VideoFrame vf)
         {

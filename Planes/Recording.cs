@@ -29,6 +29,36 @@ namespace Dopple
             }
         }
 
+        System.Timers.Timer playTimer;
+        bool isPlaying = false;
+        public bool IsPlaying
+        {
+            get => isPlaying;
+            set { 
+                isPlaying = value; 
+                if (isPlaying)
+                {
+                    playTimer = new System.Timers.Timer();
+                    playTimer.Elapsed += PlayTimer_Elapsed;
+                    playTimer.Interval = 1000 / 30.0;
+                    playTimer.Start();
+                }
+                else
+                {
+                    playTimer.Stop();
+                    playTimer.Elapsed -= PlayTimer_Elapsed;
+                    playTimer = null;
+                }
+            }
+        }
+
+        private void PlayTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
+        {
+            CurrentFrameIdx = (CurrentFrameIdx + 1) % NumFrames;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("CurrentFrameIdx"));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("CurrentFrame"));
+        }
+
         public string Name { get; }
 
         public Frame CurrentFrame => Frames[this.curFrameIdx];
@@ -103,37 +133,7 @@ namespace Dopple
                     this.completeFrames.Add(st);
                 }
             }
-
-            int itidx = 0;
-            foreach (Frame st in this.completeFrames)
-            {
-                float minval, maxval, avgval;
-                //st.vf.MaskDepth(0.1f, 0.8f);
-                st.vf.GetDepthVals(out minval, out maxval, out avgval);
-                //st.vf.VidEdge();
-                //st.vf.Blur();
-                if (!init)
-                {
-                    recmin = minval;
-                    recmax = maxval;
-                    recavg = avgval;
-                    avgweight = 1;
-                    init = true;
-                }
-                else
-                {
-                    recmin = Math.Min(minval, recmin);
-                    recmax = Math.Max(maxval, recmax);
-                    recavg += avgval;
-                    avgweight += 1;
-                }
-                itidx++;
-            }
-
             this.OnFrameProcessed += Recording_OnFrameProcessed;
-
-            MinDepthVal = recmin;
-            MaxDepthVal = recmax;
             recavg /= avgweight;
 
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("NumFrames"));

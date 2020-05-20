@@ -33,6 +33,7 @@
                     <Label Content="{Binding NumFrames}" Margin="5"/>
                     <Label Content="Current Frame" Margin="10,5,5,5"/>
                     <TextBox Text="{Binding Path=CurrentFrameIdx, UpdateSourceTrigger=LostFocus}" Margin="5" />
+                    <ToggleButton Content="Play" IsChecked="{Binding Path=IsPlaying}" />
                 </StackPanel>
 
             </Grid>
@@ -59,6 +60,12 @@
             <TextBox Text="{Binding Path=PlaneThreshold, UpdateSourceTrigger=LostFocus}"/>
             <Label Content="MinDPVal" />
             <TextBox Text="{Binding Path=MinDPVal, UpdateSourceTrigger=LostFocus}"/>
+            <Label Content="MaxCoverage" />
+            <TextBox Text="{Binding Path=MaxCoverage, UpdateSourceTrigger=LostFocus}"/>
+            <Label Content="Blur" />
+            <TextBox Text="{Binding Path=Blur, UpdateSourceTrigger=LostFocus}"/>
+            <Label Content="DepthLod" />
+            <TextBox Text="{Binding DepthLod, UpdateSourceTrigger=LostFocus}"/>
         </StackPanel>
         <ContentControl Margin="10" Grid.Row="2" Grid.Column="1" Content="{Binding ActiveRecording}" />
     </Grid>

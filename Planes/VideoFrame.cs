@@ -39,14 +39,13 @@ namespace Dopple
         public byte[] depthData;
         public byte[] imageData;
 
-        public bool HasDepth { get { return this.DepthStride != 0; } }
+        public bool HasDepth { get { return this.depthBytesPerRow != 0; } }
         public int ImageWidth { get { return this.imageWidth; } }
         public int ImageHeight { get { return this.imageHeight; } }
         public int ImageBytesPerRow { get { return this.imageBytesPerRow; } }
-        public int DepthWidth { get { return this.depthWidth; } }
-        public int DepthHeight { get { return this.depthHeight; } }
-        public int DepthStride { get { return this.depthBytesPerRow; } }
-
+        public int DepthWidth { get { return this.depthWidth >> App.Settings.DepthLod; } }
+        public int DepthHeight { get { return this.depthHeight >> App.Settings.DepthLod; } }
+        
         public static VideoFrame FromBytes(byte[] bytes)
         {
             BinaryFormatter bf = new BinaryFormatter();
@@ -55,53 +54,24 @@ namespace Dopple
             return (VideoFrame)bf.Deserialize(ms);
         }
 
-        public void GetDepthVals(out float minval, out float maxval, out float avgval)
-        {
-            minval = maxval = avgval = -1;
-            if (DepthWidth == 0)
-                return;
-            float[] vals = new float[DepthHeight * DepthWidth];
-            System.Buffer.BlockCopy(depthData, 0, vals,
-                0, DepthHeight * DepthWidth * 4);
-            bool isinit = false;
-            avgval = 0;
-            float avgCt = 0;
-            for (int y = 0; y < DepthHeight; ++y)
-            {
-                for (int x = 0; x < DepthWidth; ++x)
-                {
-                    float val = vals[y * DepthWidth + x];
-                    if (!float.IsNaN(val) &&
-                        val > 0)
-                    {
-                        if (!isinit)
-                        {
-                            maxval = val;
-                            minval = val;
-                            isinit = true;
-                        }
-                        maxval = Math.Max(maxval, val);
-                        minval = Math.Min(minval, val);
-                        avgval += val;
-                        avgCt += 1.0f;
-                    }
-                }
-            }
-            avgval /= avgCt;
-        }
+        [DllImport("ptslib.dll")]
+        public static extern void DepthBlur(IntPtr pDepthBuffer, IntPtr pOutEdges, int depthWidth, int depthHeight, int blur);
 
         [DllImport("ptslib.dll")]
-        public static extern void DepthFindEdges(IntPtr pDepthBuffer, IntPtr pOutNormals, int depthWidth, int depthHeight);
+        public static extern void ImageBlur(IntPtr pImageBuffer, IntPtr pOutEdges, int imageWidth, int iamgeHeight, int blur);        
+
+        [DllImport("ptslib.dll")]
+        public static extern void DepthBuildLods(IntPtr pDepthBuffer, IntPtr outpts, int depthWidth, int depthHeight);
 
         [DllImport("ptslib.dll")]
         public static extern void DepthFindNormals(IntPtr pDepthPts, IntPtr pOutNormals, int ptx, int pty, int depthWidth, int depthHeight);
 
         [DllImport("ptslib.dll")]
-        public static extern void SetPlaneConstants(float minDist, float splitThreshold, float minDPVal);
+        public static extern void SetPlaneConstants(float minDist, float splitThreshold, float minDPVal, float maxCoverage);
 
         public static void RefreshConstant()
         {
-            SetPlaneConstants(App.Settings.PlaneMinSize, App.Settings.PlaneThreshold, App.Settings.MinDPVal);
+            SetPlaneConstants(App.Settings.PlaneMinSize, App.Settings.PlaneThreshold, App.Settings.MinDPVal, App.Settings.MaxCoverage);
         }
 
         [DllImport("ptslib.dll")]
@@ -112,34 +82,24 @@ namespace Dopple
         CallingConvention = CallingConvention.Cdecl, SetLastError = false)]
         public static extern IntPtr memcpy(IntPtr dest, IntPtr src, UIntPtr count);
 
-
-        private Vector3[] depthQuads = null;
-        private Vector3[] depthTexColors = null;
-        private Vector3[] depthNormals = null;
-        private uint[] depthindices = null;
-        float[] normvals = null;
-        float[] depthCamPts = null;
-        int genCount;
-        float[] depthVals = null;
-        public float[] DepthVals
+        public float[]GetDepthVals()
         {
-            get
-            {
-                if (depthVals == null)
-                {
-                    depthVals = new float[depthHeight * depthWidth];
-                    System.Buffer.BlockCopy(depthData, 0, depthVals,
-                        0, depthHeight * depthWidth * 4);
-                }
+            float[] depthVals = new float[depthHeight * depthWidth];
+            System.Buffer.BlockCopy(depthData, 0, depthVals,
+                0, depthHeight * depthWidth * 4);
+            if (App.Settings.DepthLod > 0)
+                return GetDepthLods(depthVals, depthWidth, depthHeight)[App.Settings.DepthLod - 1];
+            if (App.Settings.Blur > 0)
+                return GetBlurredDepth(depthVals, depthWidth, depthHeight, App.Settings.Blur);
+            else
                 return depthVals;
-            }
         }
 
 
         Vector3 ConvertDepthPt(int x, int y, float depthVal)
         {
-            float ratioX = cameraCalibrationDims.X / depthWidth;
-            float ratioY = cameraCalibrationDims.Y / depthHeight;
+            float ratioX = cameraCalibrationDims.X / DepthWidth;
+            float ratioY = cameraCalibrationDims.Y / DepthHeight;
             Vector4 cMat = cameraCalibrationVals;
             float xScl = cMat.X / ratioX;
             float yScl = cMat.Y / ratioY;
@@ -154,49 +114,60 @@ namespace Dopple
             return new Vector3(modelPos);
         }
 
-        Dictionary<int, V3Pt> cachedDepthPts = null;
-        public Dictionary<int, V3Pt> DepthPts { get
+        public Matrix4 CameraMatrix
+        {
+            get
             {
-                if (cachedDepthPts == null)
-                    CalcDepthPoints();
-                return cachedDepthPts;
-            } }
+                float ratioX = cameraCalibrationDims.X / DepthWidth;
+                float ratioY = cameraCalibrationDims.Y / DepthHeight;
+                Vector4 cMat = cameraCalibrationVals;
+                float xScl = ratioX / cMat.X;
+                float yScl = ratioY / cMat.Y;
+                float xOff = cMat.Z / ratioX + (30 * DepthWidth / 640);
+                float yOff = cMat.W / ratioY;
+                Matrix4 proj = new Matrix4(
+                    new Vector4(xScl, 0, 0, -xOff * xScl),
+                    new Vector4(0, yScl, 0, -yOff * yScl),
+                    new Vector4(0, 0, 0, 1),
+                    new Vector4(0, 0, 1, 0));
 
-        void CalcDepthPoints()
+                return Matrix4.CreateRotationZ(-(float)Math.PI / 2.0f) *
+                    Matrix4.CreateRotationY((float)Math.PI) *
+                    proj;
+            }
+        }
+
+
+        public Matrix4 ProjectionMat
+        {
+            get
+            {
+                return CameraMatrix.Inverted() *
+                    Matrix4.CreateScale(-1.0f / DepthWidth, -1.0f / DepthHeight, 1) *
+                    Matrix4.CreateTranslation(0.5f, 0.5f, 0);
+
+            }
+        }
+
+        public Dictionary<int, V3Pt> CalcDepthPoints()
         {
             int depthHeight = DepthHeight;
             int depthWidth = DepthWidth;
 
-            float[] valsdx = new float[depthHeight * depthWidth];
-            float[] valsdy = new float[depthHeight * depthWidth];
-
-            Array.Copy(DepthVals, valsdx, DepthVals.Length);
-            Array.Copy(DepthVals, valsdy, DepthVals.Length);
-
-            float ratioX = cameraCalibrationDims.X / depthWidth;
-            float ratioY = cameraCalibrationDims.Y / depthHeight;
-            Vector4 cMat = cameraCalibrationVals;
-            float xScl = ratioX / cMat.X;
-            float yScl = ratioY / cMat.Y;
-            float xOff = cMat.Z / ratioX + 30;
-            float yOff = cMat.W / ratioY;
-
-            Matrix4 matTransform = Matrix4.CreateRotationZ(-(float)Math.PI / 2.0f) *
-                Matrix4.CreateRotationY((float)Math.PI);
-
             Dictionary<int, V3Pt> pos = new Dictionary<int, V3Pt>();
 
+            float []depthVals = GetDepthVals();
+            Matrix4 cm = CameraMatrix;
             for (int y = 0; y < depthHeight; ++y)
             {
                 for (int x = 0; x < depthWidth; ++x)
                 {
-                    float depthVal = DepthVals[y * depthWidth + x];
+                    float depthVal = depthVals[y * depthWidth + x];
                     if (!float.IsNaN(depthVal))
                     {
-                        float xrw = (x - xOff) * depthVal * xScl;
-                        float yrw = (y - yOff) * depthVal * yScl;
-                        Vector4 viewPos = new Vector4(xrw, yrw, depthVal, 1);
-                        Vector4 modelPos = viewPos * matTransform;
+                        float z = 1 / depthVal;
+                        Vector4 modelPos = Vector4.Transform(cm, new Vector4(x, y, z, 1));
+                        modelPos /= modelPos.W;
                         pos.Add(y * depthWidth + x, new V3Pt(new Vector3(modelPos.X, modelPos.Y, modelPos.Z),
                             new Vector2((float)x / (float)(depthWidth - 1), (float)y / (float)(depthHeight - 1))));
                     }
@@ -205,7 +176,115 @@ namespace Dopple
                     }
                 }
             }
-            this.cachedDepthPts = pos;
+            return pos;
+        }
+
+       
+
+        public float MaxEdge { get; set; }
+
+        static float [][]GetDepthLods(float []depthVals, int width, int height)
+        {
+            int dw = width;
+            int dh = height;
+
+            int totalFloats = 0;
+            int nLods = 0;
+            while (dw >= 16)
+            {
+                dw /= 2;
+                dh /= 2;
+
+                totalFloats += (dw * dh);
+                nLods++;
+            }
+
+            IntPtr depthPtr = Marshal.AllocHGlobal(width * height * 4);
+            IntPtr depthOut = Marshal.AllocHGlobal(totalFloats * 4);
+            Marshal.Copy(depthVals, 0, depthPtr, depthVals.Length);
+            DepthBuildLods(depthPtr, depthOut, width, height);
+
+            float[] alllods = new float[totalFloats];
+            Marshal.Copy(depthOut, alllods, 0, totalFloats);
+
+            Marshal.FreeHGlobal(depthPtr);
+            Marshal.FreeHGlobal(depthOut);
+            float[][] lods = new float[nLods][];
+
+            dw = width;
+            dh = height;
+
+            int offset = 0;
+            for (int i = 0; i < nLods; ++i)
+            {
+                dw /= 2;
+                dh /= 2;
+
+                lods[i] = new float[dw * dh];
+                Array.Copy(alllods, offset, lods[i], 0, dw * dh);
+                offset = dw * dh; 
+            }
+
+            return lods;
+        }
+
+        static float []GetBlurredDepth(float[] depthVals, int depthWidth, int depthHeight, int blur)
+        {
+            float[] depthBlur = null;
+            int bytesPerFrame = depthWidth * depthHeight * 4;
+            IntPtr depthPtr = Marshal.AllocHGlobal(bytesPerFrame);
+            IntPtr depthOut = Marshal.AllocHGlobal(bytesPerFrame);
+            Marshal.Copy(depthVals, 0, depthPtr, depthVals.Length);
+            DepthBlur(depthPtr, depthOut, depthWidth, depthHeight, blur);
+            depthBlur = new float[depthWidth * depthHeight];
+            Marshal.Copy(depthOut, depthBlur, 0, depthBlur.Length);
+            Marshal.FreeHGlobal(depthPtr);
+            Marshal.FreeHGlobal(depthOut);
+            return depthBlur;
+        }
+
+        public static byte[] GetBlurredImage(byte[] imageVals, int imageWidth, int imageHeight, int blur)
+        {
+            byte[] imageBlur = null;
+            int bytesPerFrame = imageWidth * imageHeight;
+            IntPtr imagePtr = Marshal.AllocHGlobal(bytesPerFrame);
+            IntPtr imageOut = Marshal.AllocHGlobal(bytesPerFrame);
+            Marshal.Copy(imageVals, 0, imagePtr, imageVals.Length);
+            ImageBlur(imagePtr, imageOut, imageWidth, imageHeight, blur);
+            imageBlur = new byte[imageVals.Length];
+            Marshal.Copy(imageOut, imageBlur, 0, imageBlur.Length);
+            Marshal.FreeHGlobal(imagePtr);
+            Marshal.FreeHGlobal(imageOut);
+            return imageBlur;
+        }
+
+        void CalcDepthEdges()
+        {
+
+            float[] dv = GetDepthVals();
+            float []depthDiff = new float[DepthWidth * DepthHeight];
+            //List<float> svals = new List<float>();
+
+            for (int h = 1; h < (DepthHeight - 1); ++h)
+            {
+                for (int w = 1; w < (DepthWidth - 1); ++w)
+                {
+                    float dw00 = 1 / dv[h * DepthWidth + (w - 1)];
+                    float dw01 = 1 / dv[h * DepthWidth + (w + 1)];
+                    float dw10 = 1 / dv[(h - 1) * DepthWidth + w];
+                    float dw11 = 1 / dv[(h + 1) * DepthWidth + w];
+                    float dv0 = 1 / dv[h * DepthWidth + w];
+                    float dw = Math.Abs((dv0 * 4) - (dw00 + dw01 + dw10 + dw11));
+                    if (!float.IsNaN(dw) && !float.IsInfinity(dw))
+                    {
+                        MaxEdge = Math.Max(MaxEdge, dw);
+                        //svals.Add(dw);
+                    }
+                    depthDiff[h * DepthWidth + w] = dw;
+                }
+            }
+
+            //svals.Sort();
         }
         void CopyToVector(float[] floats, Vector3[] vectors)
         {
@@ -219,19 +298,20 @@ namespace Dopple
 
         public void MakePlanes(out Vector3[] outPts, out Vector3[] outTex, out int cnt)
         {
-            int bytesPerFrame = DepthStride * DepthHeight * 3;
-            this.depthQuads = new Vector3[DepthWidth * DepthHeight * 6];
+            int bytesPerFrame = DepthWidth * DepthHeight * 4 * 3;
+            Vector3 []depthQuads = new Vector3[DepthWidth * DepthHeight * 6];
             IntPtr depthPtsPtr = Marshal.AllocHGlobal(bytesPerFrame);
             IntPtr depthNrmPtr = Marshal.AllocHGlobal(bytesPerFrame);
             IntPtr genVerticesPtr = Marshal.AllocHGlobal(depthQuads.Length * 12);
             IntPtr genTexCoordsPtr = Marshal.AllocHGlobal(depthQuads.Length * 12);
 
-            var pts = DepthPts;
-            float[] fpts = new float[this.depthWidth * this.depthHeight * 3];
+            float[] fpts = new float[this.DepthWidth * this.DepthHeight * 3];
             for (int i = 0; i < fpts.Length; ++i)
             {
                 fpts[i] = float.PositiveInfinity;
             }
+
+            var pts = CalcDepthPoints();
             foreach (var kv in pts)
             {
                 int idx = kv.Key;
@@ -241,6 +321,7 @@ namespace Dopple
             }
             Marshal.Copy(fpts, 0, depthPtsPtr, fpts.Length);
             DepthFindNormals(depthPtsPtr, depthNrmPtr, 0, 0, DepthWidth, DepthHeight);
+            int genCount = 0;
             DepthMakePlanes(depthPtsPtr, genVerticesPtr, genTexCoordsPtr, depthQuads.Length, out genCount,
                 DepthWidth, DepthHeight);
 

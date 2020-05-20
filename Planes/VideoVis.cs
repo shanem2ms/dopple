@@ -2,13 +2,15 @@
 using OpenTK.Graphics.ES30;
 using OpenTK;
 using GLObjects;
+using System.Windows.Documents;
+using System.Linq;
 
 namespace Planes
 {
     class VideoVis
     {
         Vector2 depthVals;
-        
+
         private Program _Program;
         private VertexArray vaScreenQuad;
         private TextureYUV _ImageTexture;
@@ -48,21 +50,26 @@ namespace Planes
             _ImageTexture = new TextureYUV();
             _DepthTexture = new TextureFloat();
             markersTex = new TextureR8();
-            float invmax = 1.0f /  App.Recording.MaxDepthVal;
+            float invmax = 1.0f / App.Recording.MaxDepthVal;
             float invmin = 1.0f / App.Recording.MinDepthVal;
             depthVals.X = invmax;
             depthVals.Y = 1.0f / (invmin - invmax);
+            App.Settings.OnSettingsChanged += Settings_OnSettingsChanged;
         }
 
-
         bool hasNewFrame = true;
+        private void Settings_OnSettingsChanged(object sender, EventArgs e)
+        {
+            hasNewFrame = true;
+        }
+
         private void ActiveRecording_OnFrameChanged(object sender, int e)
         {
             hasNewFrame = true;
         }
 
 
-        public void Render()
+        public void Render(Matrix4 viewProj)
         {
             if (hasNewFrame)
             {
@@ -72,32 +79,20 @@ namespace Planes
                 Dopple.VideoFrame vf = App.Recording.Frames[curFrame].vf;
                 _ImageTexture.LoadImageFrame(vf.ImageWidth, vf.ImageHeight,
                     vf.imageData);
-                _DepthTexture.LoadDepthFrame(vf.DepthWidth, vf.DepthHeight,
-                    vf.depthData);
+                float[] depthVals = vf.GetDepthVals();
+                _DepthTexture.LoadDepthFrame(vf.DepthWidth, vf.DepthHeight, depthVals);
+
+                var dvValid = depthVals.Where(f => !float.IsNaN(f) && !float.IsInfinity(f));
+                float minval = dvValid.Min(), maxval = dvValid.Max();
+                this.depthVals = new Vector2(1.0f / minval, 1.0f / maxval);
                 byte[] data = new byte[1024 * 1024];
                 for (int i = 0; i < data.Length; ++i)
                 { data[i] = 0; }
                 float invWidth = 1.0f / vf.ImageWidth * 1024.0f;
                 float invHeight = 1.0f / vf.ImageHeight * 1024.0f;
-                foreach (var match in App.OpenCV.ActiveMatches)
-                {
-                    Vector2 pt = match.pts[this.frameOffset];
-                    int w = (int)(pt.X * invHeight);
-                    int h = (int)(pt.Y * invWidth);
-                    int r = 2;
-                    for (int xv = w - r; xv < w + r; ++xv)
-                    {
-                        for (int yv = h - r; yv < h + r; ++yv)
-                        {
-                            if (xv < 0 || yv < 0 || xv >= 1024 || yv >= 1024)
-                                continue;
-                            data[xv * 1024 + yv] = 255;
-                        }
-                    }
-                }
-                markersTex.LoadData(1024, 1024, data);
                 hasNewFrame = false;
             }
+
             _Program.Use(0);
 
             _Program.Set1("hasDepth", 0);
@@ -109,14 +104,8 @@ namespace Planes
             _DepthTexture.BindToIndex(2);
             _Program.Set1("markerTex", (int)3);
             markersTex.BindToIndex(3);
-            // Compute the model-view-projection on CPU
-            Matrix4 projection = Matrix4.CreateOrthographicOffCenter(0, 1, 0, 1, 1, 0);
-            Matrix4 modelview = Matrix4.CreateTranslation(-0.5f, -0.5f, 0) * Matrix4.CreateRotationZ(-(float)Math.PI / 2.0f) *
-                Matrix4.CreateTranslation(0.5f, 0.5f, 0);
-
-            Matrix4 matWorldViewProj = modelview * projection;
             // Set uniform state
-            _Program.SetMat4("uMVP", ref matWorldViewProj);
+            _Program.SetMat4("uMVP", ref viewProj);
             // Use the vertex array
             // Draw triangle
             // Note: vertex attributes are streamed from GPU memory

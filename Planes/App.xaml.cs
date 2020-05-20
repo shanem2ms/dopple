@@ -39,15 +39,21 @@ namespace Planes
 
     public class Settings
     {
-        float planeMinSize = 1.0f;
-        float planeThreshold = 0.045f;
+        float planeMinSize = 0.01f;
+        float planeThreshold = 0.015f;
         float minDPVal = 0.9f;
+        float maxCoverage = 10.0f;
+        int blur = 0;
+        int depthLod = 2;
 
         public event EventHandler<EventArgs> OnSettingsChanged;
 
         public float PlaneMinSize { get => planeMinSize; set { planeMinSize = value; Refresh(); } }
         public float PlaneThreshold { get => planeThreshold; set { planeThreshold = value; Refresh(); } }
         public float MinDPVal { get => minDPVal; set { minDPVal = value; Refresh(); } }
+        public float MaxCoverage { get => maxCoverage; set { maxCoverage = value; Refresh(); } }
+        public int Blur { get => blur; set { blur = value; Refresh(); } }
+        public int DepthLod { get => depthLod; set { depthLod = value; Refresh(); } }
 
         void Refresh()
         {

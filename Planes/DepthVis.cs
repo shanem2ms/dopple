@@ -1,121 +1,107 @@
 ﻿using System;
-using System.Collections.Generic;
 using OpenTK.Graphics.ES30;
 using OpenTK;
 using GLObjects;
+using System.Windows.Documents;
 using System.Linq;
 
 namespace Planes
 {
     class DepthVis
     {
-        /// The program used for drawing the triangle.
-        /// </summary>
+        Vector2 depthVals;
+
         private Program _Program;
+        private VertexArray vaScreenQuad;
+        private TextureFloat _DepthTexture;
+        TextureR8 markersTex;
+
+        int frameOffset;
+        private static readonly Vector3[] _ArrayPosition = new Vector3[] {
+            new Vector3(0.0f, 0.0f, 0.0f),
+            new Vector3(1.0f, 0.0f, 0.0f),
+            new Vector3(1.0f, 1.0f, 0.0f),
+            new Vector3(0.0f, 1.0f, 0.0f)
+        };
+
+        private static readonly ushort[] _ArrayElems = new ushort[]
+        {
+            0, 1, 2, 2, 3, 0,
+        };
 
         /// <summary>
-        /// The vertex arrays used for drawing the triangle.
+        /// Vertex color array.
         /// </summary>
-        private VertexArray genVertexArray = null;
+        private static readonly Vector3[] _ArrayTexCoord = new Vector3[] {
+            new Vector3(0.0f, 0.0f, 0.0f),
+            new Vector3(1.0f, 0.0f, 0.0f),
+            new Vector3(1.0f, 1.0f, 1.0f),
+            new Vector3(0.0f, 1.0f, 0.0f),
+        };
 
 
-        public DepthVis()
+        public DepthVis(int _frameOffset)
         {
-            _Program = Program.FromFiles("Main.vert", "Main.frag");
+            frameOffset = _frameOffset;
+            App.Recording.OnFrameChanged += ActiveRecording_OnFrameChanged;
+            _Program = Registry.Programs["depth"];
+            vaScreenQuad = new VertexArray(_Program, _ArrayPosition, _ArrayElems, _ArrayTexCoord, null);
+            _DepthTexture = new TextureFloat();
+            markersTex = new TextureR8();
+            float invmax = 1.0f / App.Recording.MaxDepthVal;
+            float invmin = 1.0f / App.Recording.MinDepthVal;
+            depthVals.X = invmax;
+            depthVals.Y = 1.0f / (invmin - invmax);
+            App.Settings.OnSettingsChanged += Settings_OnSettingsChanged;
         }
 
-        public void Rebuild()
+        bool hasNewFrame = true;
+        private void Settings_OnSettingsChanged(object sender, EventArgs e)
         {
-            if (currentFrame != null)
-                SetVideoFrame(currentFrame);
+            hasNewFrame = true;
         }
 
-        bool ptsMode = true;
-        Dopple.Frame currentFrame;
-        int triCnt;
-        public void SetVideoFrame(Dopple.Frame f)
+        private void ActiveRecording_OnFrameChanged(object sender, int e)
         {
-            currentFrame = f;
-            if (ptsMode)
+            hasNewFrame = true;
+        }
+
+
+        public void Render(Matrix4 viewProj)
+        {
+            if (hasNewFrame)
             {
-                Vector3[] pts = currentFrame.vf.GetDepthPoints();
-                float dist = 0.001f;
-                List<Vector3> qpts = new List<Vector3>();
-                List<uint> ind = new List<uint>();
-                foreach (Vector3 p in pts)
-                {
-                    if (float.IsInfinity(p.X))
-                        continue;
-                    uint cIdx = (uint)qpts.Count;
-                    qpts.Add(p - Vector3.UnitX * dist
-                               - Vector3.UnitY * dist);
-                    qpts.Add(p + Vector3.UnitX * dist
-                               - Vector3.UnitY * dist);
-                    qpts.Add(p - Vector3.UnitX * dist
-                               + Vector3.UnitY * dist);
-                    qpts.Add(p + Vector3.UnitX * dist
-                               + Vector3.UnitY * dist);
-                    ind.Add(cIdx);
-                    ind.Add(cIdx + 1);
-                    ind.Add(cIdx + 2);
-                    ind.Add(cIdx + 1);
-                    ind.Add(cIdx + 3);
-                    ind.Add(cIdx + 2);
-                }
+                int curFrame = App.Recording.CurrentFrameIdx + this.frameOffset;
+                if (curFrame >= App.Recording.Frames.Count)
+                    curFrame = App.Recording.Frames.Count - 1;
+                Dopple.VideoFrame vf = App.Recording.Frames[curFrame].vf;
+                float[] depthVals = vf.GetDepthVals();
+                _DepthTexture.LoadDepthFrame(vf.DepthWidth, vf.DepthHeight, depthVals);
 
-                pts = qpts.ToArray();
-                genVertexArray = new VertexArray(this._Program, pts, ind.ToArray(), pts, null);
+                var dvValid = depthVals.Where(f => !float.IsNaN(f) && !float.IsInfinity(f));
+                float minval = dvValid.Min(), maxval = dvValid.Max();
+                this.depthVals = new Vector2(1.0f / minval, 1.0f / maxval);
+                byte[] data = new byte[1024 * 1024];
+                for (int i = 0; i < data.Length; ++i)
+                { data[i] = 0; }
+                float invWidth = 1.0f / vf.ImageWidth * 1024.0f;
+                float invHeight = 1.0f / vf.ImageHeight * 1024.0f;
+                hasNewFrame = false;
             }
-            else
-            {
-                Vector3[] pts, texcoords;
-                currentFrame.vf.MakePlanes(out pts, out texcoords, out triCnt);
-                uint[] depthindices = new uint[triCnt];
-                for (int idx = 0; idx < depthindices.Length; ++idx)
-                    depthindices[idx] = (uint)idx;
-
-                genVertexArray = new VertexArray(this._Program, pts, depthindices, texcoords, null);
-            }
-        }
-
-
-        public void Render(Matrix4 viewProjMat)
-        {
-            if (genVertexArray == null)
-                return;
 
             _Program.Use(0);
-            _Program.SetMat4("uMVP", ref viewProjMat);
-            _Program.Set3("meshColor", new Vector3(0, 0, 1));
 
-            genVertexArray.Draw();
-
+            _Program.Set1("hasDepth", 0);            
+            _Program.Set1("depthSampler", (int)0);
+            _DepthTexture.BindToIndex(0);
+            _Program.Set1("markerTex", (int)3);
+            markersTex.BindToIndex(3);
+            // Set uniform state
+            _Program.SetMat4("uMVP", ref viewProj);
+            // Use the vertex array
+            // Draw triangle
+            // Note: vertex attributes are streamed from GPU memory
+            vaScreenQuad.Draw();
         }
-        private static readonly Vector3[] _Quad = new Vector3[] {
-            new Vector3(1.0f, 0.0f, 0.0f),  // 0 
-            new Vector3(0.0f, 0.0f, 0.0f),  // 1
-            new Vector3(0.0f, 1.0f, 0.0f),  // 2
-
-            new Vector3(1.0f, 0.0f, 0.0f),  // 0 
-            new Vector3(0.0f, 1.0f, 0.0f),  // 2
-            new Vector3(1.0f, 1.0f, 0.0f)  // 3 
-        };
-
-        private static readonly uint[] _Indices = new uint[]
-        {
-            0,1,2,3,4,5
-        };
-
-
-        private static readonly Vector3[] _TexCoords = new Vector3[] {
-            new Vector3(0.0f, 1.0f, 0.0f),  // 0 
-            new Vector3(1.0f, 1.0f, 0.0f),  // 1
-            new Vector3(1.0f, 0.0f, 0.0f),  // 2
-
-            new Vector3(0.0f, 1.0f, 0.0f),  // 0 
-            new Vector3(1.0f, 0.0f, 0.0f),  // 2
-            new Vector3(0.0f, 0.0f, 0.0f)  // 3 
-        };
-
     }
 }

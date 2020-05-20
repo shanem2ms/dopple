@@ -115,11 +115,17 @@
       <SubType>Designer</SubType>
     </ApplicationDefinition>
     <Compile Include="DepthPtsVis.cs" />
+    <Compile Include="DepthVis.cs" />
     <Compile Include="MatchesVis.cs" />
+    <Compile Include="MatchVis.cs" />
     <Compile Include="OpenCV.cs" />
     <Compile Include="PtCloudAligner.cs" />
+    <Compile Include="PtsRenderer.cs" />
     <Compile Include="Recording.cs" />
+    <Compile Include="Selection.cs" />
     <Compile Include="VideoFrame.cs" />
+    <Compile Include="DepthRenderer.cs" />
+    <Compile Include="VideoRenderer.cs" />
     <Compile Include="VideoVis.cs" />
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
@@ -165,6 +171,12 @@
     <None Include="Shaders\BltTex.vert">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="Shaders\DepthPts.frag">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Shaders\DepthPts.vert">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="Shaders\Main.frag">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
@@ -172,6 +184,12 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="Shaders\Pick.frag">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Shaders\DepthShader.frag">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Shaders\DepthShader.vert">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="Shaders\VidShader.frag">
