@@ -7,82 +7,8 @@
 #include <algorithm>
 #include "Pt.h"
 
-extern "C" {
-    DXY* tmpDbuf = nullptr;
-    DXY* tmpDbuf2 = nullptr;
-    __declspec (dllexport) void DepthFindEdges(unsigned short* dbuf, float* outpts, int depthWidth, int depthHeight)
-    {
-        if (tmpDbuf == nullptr)
-        {
-            tmpDbuf = new DXY[depthWidth * depthHeight];
-            tmpDbuf2 = new DXY[depthWidth * depthHeight];
-        }
-        for (int y = 0; y < depthHeight; ++y)
-        {
-            for (int x = 1; x < depthWidth; ++x)
-            {
-                unsigned short px = dbuf[y * depthWidth + x - 1];
-                unsigned short nx = dbuf[y * depthWidth + x];
-                tmpDbuf[y * depthWidth + x].dx = (px > 0 && nx > 0) ?
-                    nx - px : badval;
-            }
-        }
-
-        for (int y = 1; y < depthHeight; ++y)
-        {
-            for (int x = 0; x < depthWidth; ++x)
-            {
-                unsigned short py = dbuf[(y - 1) * depthWidth + x];
-                unsigned short ny = dbuf[y * depthWidth + x];
-                tmpDbuf[y * depthWidth + x].dy = (py > 0 && ny > 0) ?
-                    ny - py : badval;
-            }
-        }
-
-        int maxx = 0;
-        int maxy = 0;
-        for (int y = 1; y < depthHeight - 1; ++y)
-        {
-            for (int x = 1; x < depthWidth - 1; ++x)
-            {
-                DXY& d = tmpDbuf[y * depthWidth + x];
-                DXY& dx1 = tmpDbuf[y * depthWidth + x - 1];
-                DXY& dy1 = tmpDbuf[(y - 1) * depthWidth + x];
-                if (d.IsValid() && dx1.IsValid() && dy1.IsValid())
-                {
-                    DXY ddx = d - dx1;
-                    DXY ddy = d - dy1;
-                    tmpDbuf2[y * depthWidth + x] = DXY(ddx.LengthSq(),
-                        ddy.LengthSq());
-                    maxx = max(maxx, tmpDbuf2[y * depthWidth + x].dx);
-                    maxy = max(maxy, tmpDbuf2[y * depthWidth + x].dy);
-                }
-                else
-                    tmpDbuf2[y * depthWidth + x] = DXY(badval, badval);
-            }
-        }
-
-        float* outNrm = (float*)outpts;
-        for (int y = 1; y < depthHeight - 1; ++y)
-        {
-            for (int x = 1; x < depthWidth - 1; ++x)
-            {
-                float fvx = (float)tmpDbuf2[y * depthWidth + x].dx;
-                float fvy = (float)tmpDbuf2[y * depthWidth + x].dy;
-                float fdd = tmpDbuf2->IsValid() ? (float)tmpDbuf2[y * depthWidth + x].LengthSq() : 0;
-                float fd = tmpDbuf->IsValid() ? (float)tmpDbuf[y * depthWidth + x].LengthSq() : 0;
-                int ptIdx = y * depthWidth + x;
-                outNrm[ptIdx * 3] = 0;
-                outNrm[ptIdx * 3 + 1] = fd - 3000.0f;
-                outNrm[ptIdx * 3 + 2] = fdd - 3000.0f;
-            }
-        }
-    }
-}
-
 extern "C"
 {
-
     Pt* tmpNrm = nullptr;
     static float threshhold = .75;
     __declspec (dllexport) void DepthFindNormals(float* vals, float* outpts, int px, int py, int depthWidth, int depthHeight)
@@ -146,3 +72,231 @@ extern "C"
     }
 }
 
+extern "C"
+{
+    __declspec (dllexport) void DepthBlur(float* dbuf, float* outpts, int depthWidth, int depthHeight, int blur)
+    {
+        std::vector<float> dinv;
+        dinv.reserve(depthWidth * depthHeight);
+        float* dend = dbuf + (depthWidth * depthHeight);
+        for (float* dptr = dbuf; dptr != dend; ++dptr)
+        {
+            if (std::isnan(*dptr) || std::isinf(*dptr))
+                dinv.push_back(NAN);
+            else
+                dinv.push_back(1.0f / *dptr);
+        }
+
+        for (int passIdx = 0; passIdx < blur; ++passIdx)
+        {
+            std::vector<float> doutx;
+            doutx.resize(depthWidth * depthHeight);
+
+            for (int y = 0; y < depthHeight; ++y)
+            {
+                for (int x = 0; x < depthWidth; ++x)
+                {
+                    float w = 0;
+                    float a = 0;
+                    for (int c = -1; c <= 1; ++c)
+                    {
+                        int xc = x + c;
+                        if (xc >= 0 && xc < depthWidth)
+                        {
+                            float v = dinv[y * depthWidth + xc];
+                            if (!std::isnan(v) && !std::isinf(v))
+                            {
+                                w += 1.0f;
+                                a += v;
+                            }
+                        }
+                    }
+                    if (w == 0)
+                        doutx[y * depthWidth + x] = NAN;
+                    else
+                        doutx[y * depthWidth + x] = a / w;
+                }
+            }
+
+            std::vector<float> douty;
+            douty.resize(depthWidth * depthHeight);
+            for (int x = 0; x < depthWidth; ++x)
+            {
+                for (int y = 0; y < depthHeight; ++y)
+                {
+                    float w = 0;
+                    float a = 0;
+                    for (int c = -1; c <= 1; ++c)
+                    {
+                        int yc = y + c;
+                        if (yc >= 0 && yc < depthHeight)
+                        {
+                            float v = doutx[yc * depthWidth + x];
+                            if (!std::isnan(v) && !std::isinf(v))
+                            {
+                                w += 1.0f;
+                                a += v;
+                            }
+                        }
+                    }
+                    if (w == 0)
+                        douty[y * depthWidth + x] = NAN;
+                    else
+                        douty[y * depthWidth + x] = a / w;
+                }
+            }
+
+            memcpy(dinv.data(), douty.data(), douty.size() * sizeof(float));
+
+        }
+
+        for (int x = 0; x < depthWidth; ++x)
+        {
+            for (int y = 0; y < depthHeight; ++y)
+            {
+                dinv[y * depthWidth + x] =
+                    1.0f / dinv[y * depthWidth + x];
+            }
+        }
+        memcpy(outpts, dinv.data(), dinv.size() * sizeof(float));
+    }
+
+    __declspec (dllexport) void ImageBlur(unsigned char* ibuf, unsigned char* outpts, int imageWidth, int imageHeight, int blur)
+    {
+        std::vector<float> dinv;
+        dinv.reserve(imageWidth * imageHeight);
+        {
+            unsigned char* dend = ibuf + (imageWidth * imageHeight);
+            for (unsigned char* dptr = ibuf; dptr != dend; ++dptr)
+            {
+                dinv.push_back(*dptr);
+            }
+        }
+
+        for (int passIdx = 0; passIdx < blur; ++passIdx)
+        {
+            std::vector<float> doutx;
+            doutx.resize(imageWidth * imageHeight);
+
+            for (int y = 0; y < imageHeight; ++y)
+            {
+                for (int x = 0; x < imageWidth; ++x)
+                {
+                    float w = 0;
+                    float a = 0;
+                    for (int c = -1; c <= 1; ++c)
+                    {
+                        int xc = x + c;
+                        if (xc >= 0 && xc < imageWidth)
+                        {
+                            float v = dinv[y * imageWidth + xc];
+                            w += 1.0f;
+                            a += v;
+                        }
+                    }
+                    if (w == 0)
+                        doutx[y * imageWidth + x] = NAN;
+                    else
+                        doutx[y * imageWidth + x] = a / w;
+                }
+            }
+
+            std::vector<float> douty;
+            douty.resize(imageWidth * imageHeight);
+            for (int x = 0; x < imageWidth; ++x)
+            {
+                for (int y = 0; y < imageHeight; ++y)
+                {
+                    float w = 0;
+                    float a = 0;
+                    for (int c = -1; c <= 1; ++c)
+                    {
+                        int yc = y + c;
+                        if (yc >= 0 && yc < imageHeight)
+                        {
+                            float v = doutx[yc * imageWidth + x];
+                            if (!std::isnan(v) && !std::isinf(v))
+                            {
+                                w += 1.0f;
+                                a += v;
+                            }
+                        }
+                    }
+                    if (w == 0)
+                        douty[y * imageWidth + x] = NAN;
+                    else
+                        douty[y * imageWidth + x] = a / w;
+                }
+            }
+
+            memcpy(dinv.data(), douty.data(), douty.size() * sizeof(float));
+
+        }
+
+        {
+            unsigned char* dend = outpts + (imageWidth * imageHeight);
+            auto itd = dinv.begin();
+            for (unsigned char* dptr = outpts; dptr != dend; ++dptr, ++itd)
+            {
+                *dend = (unsigned char)(*itd);
+            }
+        }
+    }
+
+    __declspec (dllexport) void DepthBuildLods(float* dbuf, float* outpts, int depthWidth, int depthHeight)
+    {
+        std::vector<float> dinv;
+        dinv.reserve(depthWidth * depthHeight);
+        float* dend = dbuf + (depthWidth * depthHeight);
+        for (float* dptr = dbuf; dptr != dend; ++dptr)
+        {
+            if (std::isnan(*dptr) || std::isinf(*dptr))
+                dinv.push_back(NAN);
+            else
+                dinv.push_back(1.0f / *dptr);
+        }
+
+        int dsw = depthWidth;
+        int dw = depthWidth / 2;
+        int dh = depthHeight / 2;
+        float* dsrc = dinv.data();
+        float* dptr = outpts;
+        while (dw >= 16)
+        {
+            for (int y = 0; y < dh; ++y)
+            {
+                for (int x = 0; x < dw; ++x)
+                {
+                    float v[4] = {
+                        dsrc[(y * 2) * dsw + (x * 2)],
+                        dsrc[(y * 2) * dsw + (x * 2) + 1],
+                        dsrc[(y * 2 + 1) * dsw + (x * 2)],
+                        dsrc[(y * 2 + 1) * dsw + (x * 2) + 1] };
+                    float t = 0;
+                    float vf = 0;
+                    for (int i = 0; i < 4; ++i)
+                    {
+                        if (!std::isnan(v[i]))
+                        {
+                            vf += v[i];
+                            t += 1.0f;
+                        }
+                    }
+                    dptr[y * dw + x] = (t > 0) ? (vf / t) : NAN;
+                }
+            }
+
+            dsrc = dptr;
+            dptr += dw * dh;
+
+            dw /= 2;
+            dsw /= 2;
+            dh /= 2;
+        }
+
+        for (float* ptr = outpts; ptr < dptr; ++ptr)
+        {
+            *ptr = !std::isnan(*ptr) ? 1.0f / *ptr : NAN;
+        }
+    }
+}

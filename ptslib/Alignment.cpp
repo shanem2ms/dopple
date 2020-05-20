@@ -361,7 +361,7 @@ public:
             }
 
             m_kdtree.optimize();
-            m_curstepsize = m_pts0.size() / 10;
+            m_curstepsize = 1;// m_pts0.size() / 10;
         }
 
         for (Match& m : m_matches)
@@ -411,6 +411,7 @@ public:
         {
             match.distsq =
                 lengthSquared(Vec3v(m_pts0[match.idx] - pts1t[match.matchedIdx]));
+            avgdistsq += match.distsq;
         }
 
         avgdistsq /= (vfloat)matches.size();
@@ -435,7 +436,7 @@ public:
         Vec3v translate2;
         Vec3v rotate2;
         BestFit(vecs0, vecs1, translate2, rotate2,
-            Vec4f(-0.396472f, -0.382595f, -0.329096f, -0.010193f));
+            Vec4f(-0.5f, -0.005f, -0.010f, -0.005f));
 
         AxisAnglev aaY(rotate2[1], Vec3v(0, 1, 0));
         AxisAnglev aaZ(rotate2[2], Vec3v(0, 0, 1));
@@ -449,13 +450,16 @@ public:
 
 
         vfloat resultscore = 0;
+        vfloat oldscore = 0;
         for (int idx = 0; idx < vecs0.size(); idx++)
         {
             Point3v tpt1;
             xform(tpt1, transform, vecs1[idx]);
             resultscore += lengthSquared(Vec3v(vecs0[idx] - tpt1));
+            oldscore += lengthSquared(Vec3v(vecs0[idx] - vecs1[idx]));
         }
         resultscore /= (vfloat)(vecs0.size() * vecs0.size());
+        oldscore /= (vfloat)(vecs0.size() * vecs0.size());
 
         int retstg;
         if (resultscore > m_previousScore)
@@ -481,6 +485,58 @@ public:
 };
 
 extern "C" {
+
+    __declspec (dllexport) int GetNearest(Point3v* pts0, size_t ptCount0, Point3v* pts1, size_t ptCount1, int *outMatches)
+    {
+        KDTree::KDTree <3, ANode> kdtree;
+        size_t ptidx = 0;
+
+        for (Point3v *pt = pts0; pt != (pts0 + ptCount0); ++pt)
+        {
+            ANode an(*pt, ptidx++);
+            kdtree.insert(an);
+        }
+
+        kdtree.optimize();
+
+        size_t midx = 0;
+        std::vector<Match> matches;
+        matches.resize(ptCount0);
+        for (Match& m : matches) { m.idx = midx++; }
+        
+        size_t mIdx = 0;
+        for (Point3v* pt1 = pts1; pt1 != (pts1 + ptCount1); ++pt1)
+        {
+            ANode v3(*pt1, 0);
+            auto itFound = kdtree.find_nearest(v3);
+            Match& match = matches[itFound.first->idx];
+
+            const Point3v& pt0 = pts0[itFound.first->idx];
+            Vec3v v3f = *pt1 - pt0;
+            vfloat distsq = lengthSquared(v3f);
+            if (match.matchedIdx < 0 ||
+                distsq < match.distsq)
+            {
+                match.distsq = distsq;
+                match.matchedIdx = mIdx;
+            }
+
+            mIdx++;
+        }
+
+        int nMatches = 0;
+        for (const Match& match : matches)
+        {
+            if (match.matchedIdx >= 0)
+            {
+                *outMatches++ = match.idx;
+                *outMatches++ = match.matchedIdx;
+                nMatches++;
+            }
+        }
+
+        return nMatches;
+    }
 
     __declspec (dllexport) PtScorer* CreatePtScorer(vfloat* m_pts0, size_t ptCount0, vfloat* m_pts1, size_t ptCount1, vfloat* pmatrix,
         int frameIdx)

@@ -78,14 +78,16 @@ extern "C"
     float g_mindist = 0.05f;
     float g_splitThreshold = 0.015f;
     float g_MinDPVal = 0.9f;
+    float g_maxCoverage = 20.0f;
     unsigned long long lastPickedId = 0;
 
     __declspec (dllexport) void SetPlaneConstants(float minDist, float splitThreshold, float
-        minDPVal)
+        minDPVal, float maxCoverage)
     {
         g_mindist = minDist;
         g_splitThreshold = splitThreshold;
         g_MinDPVal = minDPVal;
+        g_maxCoverage = maxCoverage;
     }
 
     struct Tile
@@ -553,7 +555,7 @@ extern "C"
             
             float rectDiag = sqrt(res->r.w * res->r.w + res->r.h * res->r.h) / fullDiagonal;
             float coverage = fabs(longestDiag / rectDiag);
-            if (coverage > 20.0f)
+            if (coverage > g_maxCoverage)
             {
                 //char output[1024];
                 //sprintf_s(output, "Area %f ( %f [%d, %d]) \n", coverage, longestDiag, res->r.w, res->r.h);
