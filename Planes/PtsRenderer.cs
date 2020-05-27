@@ -10,11 +10,10 @@ using System.Windows.Forms;
 
 namespace Planes
 {
-    class PtsRenderer
+    class PtsRenderer : IRenderer
     {
         public Dopple.Recording ActiveRecording => App.Recording;
         public Settings Settings => App.Settings;
-        System.Timers.Timer renderTimer = new System.Timers.Timer();
         Matrix4 projectionMat = Matrix4.CreatePerspectiveFieldOfView(60 * (float)Math.PI / 180.0f, 1, 0.05f, 20.0f) *
             Matrix4.CreateScale(new Vector3(-1, 1, 1));
         Vector3 curPos = Vector3.Zero;
@@ -41,21 +40,13 @@ namespace Planes
         Vector3 curPosDn;
         Vector3 wOffset;
 
-        public delegate void InvalidateDel();
-        public InvalidateDel Invalidate;
         int currentWidth;
         int currentHeight;
 
         public PtsRenderer()
         {
-            renderTimer.Interval = 1.0f / 60.0f;
-            renderTimer.Elapsed += RenderTimer_Elapsed;
         }
 
-        private void RenderTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
-        {
-            Invalidate();
-        }
 
 
         public Matrix4 viewMat
@@ -66,11 +57,11 @@ namespace Planes
                 return lookTrans.Inverted();
             }
         }
-        public void Load()
-        {
-            Dopple.VideoFrame.RefreshConstant();
-            Registry.LoadAllPrograms();
 
+        public float XRotDn { get => xRotDn; set => xRotDn = value; }
+
+        public override void Load()
+        {
             for (int i = 0; i < 2; ++i)
             {
                 videoVis[i] = new VideoVis(i);
@@ -78,11 +69,10 @@ namespace Planes
             }
             matchVis = new MatchVis();
             selVis = new Selection();
-            renderTimer.Start();
         }
 
 
-        public void Paint()
+        public override void Paint()
         {
             FrameBuffer.BindNone();
             GL.Disable(EnableCap.Blend);
@@ -109,7 +99,7 @@ namespace Planes
             quads[1].Draw(new Vector4(0, -1, 1, 2));
         }
 
-        public void Resize(int width, int height)
+        public override void Resize(int width, int height)
         {
             this.currentWidth = width;
             this.currentHeight = height;
@@ -119,12 +109,12 @@ namespace Planes
             FrameBuffer.SetViewPortSize(width, height);
         }
 
-        public void MouseUp(int x, int y)
+        public override void MouseUp(int x, int y)
         {
             mouseDownPt = null;
         }
 
-        public void MouseDn(int x, int y, wf.MouseButtons button)
+        public override void MouseDn(int x, int y, wf.MouseButtons button)
         {
             if (button == wf.MouseButtons.Middle && x < currentWidth / 2)
             {
@@ -157,11 +147,11 @@ namespace Planes
                 this.mouseDownPt = new Vector2(x, y);
                 this.rotMatrixDn = this.rotMatrix;
                 yRotDn = yRot;
-                xRotDn = xRot;
+                XRotDn = xRot;
             }
         }
 
-        public void MouseMove(int x, int y, MouseButtons button)
+        public override void MouseMove(int x, int y, MouseButtons button)
         {
             Vector2 curPt = new Vector2(x, y);
             if (mouseDownPt != null)
@@ -258,7 +248,7 @@ namespace Planes
             }
         }
 
-        public void MouseWheel(int delta)
+        public override void MouseWheel(int x, int y, int delta)
         {
             double multiplier = Math.Pow(2, -delta / (120.0 * 4));
             mouseDownPivot = worldPivot;
@@ -319,5 +309,7 @@ namespace Planes
             }
             return minval;
         }
+
+
     }
 }

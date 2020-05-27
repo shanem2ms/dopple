@@ -4,12 +4,13 @@ using OpenTK;
 using GLObjects;
 using System.Windows.Documents;
 using System.Linq;
+using Dopple;
 
 namespace Planes
 {
     class DepthVis
     {
-        Vector2 depthVals;
+        Vector2 depthRange;
 
         private Program _Program;
         private VertexArray vaScreenQuad;
@@ -50,8 +51,8 @@ namespace Planes
             markersTex = new TextureR8();
             float invmax = 1.0f / App.Recording.MaxDepthVal;
             float invmin = 1.0f / App.Recording.MinDepthVal;
-            depthVals.X = invmax;
-            depthVals.Y = 1.0f / (invmin - invmax);
+            depthRange.X = invmax;
+            depthRange.Y = 1.0f / (invmin - invmax);
             App.Settings.OnSettingsChanged += Settings_OnSettingsChanged;
         }
 
@@ -75,17 +76,15 @@ namespace Planes
                 if (curFrame >= App.Recording.Frames.Count)
                     curFrame = App.Recording.Frames.Count - 1;
                 Dopple.VideoFrame vf = App.Recording.Frames[curFrame].vf;
-                float[] depthVals = vf.GetDepthVals();
+                float[] depthIn = vf.GetDepthVals();
+                float avgVal;
+                float[] depthVals =
+                    VideoFrame.GetDepthInv(depthIn, vf.DepthWidth, vf.DepthHeight, out avgVal);
                 _DepthTexture.LoadDepthFrame(vf.DepthWidth, vf.DepthHeight, depthVals);
 
-                var dvValid = depthVals.Where(f => !float.IsNaN(f) && !float.IsInfinity(f));
-                float minval = dvValid.Min(), maxval = dvValid.Max();
-                this.depthVals = new Vector2(1.0f / minval, 1.0f / maxval);
-                byte[] data = new byte[1024 * 1024];
-                for (int i = 0; i < data.Length; ++i)
-                { data[i] = 0; }
-                float invWidth = 1.0f / vf.ImageWidth * 1024.0f;
-                float invHeight = 1.0f / vf.ImageHeight * 1024.0f;
+                //var dvValid = depthVals.Where(f => !float.IsNaN(f) && !float.IsInfinity(f));
+                float minval = 1 / 8.0f, maxval = 1.0f;// dvValid.Min(), maxval = dvValid.Max();
+                this.depthRange = new Vector2(0, avgVal);
                 hasNewFrame = false;
             }
 
@@ -93,6 +92,7 @@ namespace Planes
 
             _Program.Set1("hasDepth", 0);            
             _Program.Set1("depthSampler", (int)0);
+            _Program.Set2("depthRange", depthRange);
             _DepthTexture.BindToIndex(0);
             _Program.Set1("markerTex", (int)3);
             markersTex.BindToIndex(3);

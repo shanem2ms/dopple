@@ -123,12 +123,12 @@ namespace Planes
                 float maxVal = Math.Max(Math.Max(Palette[i].X, Palette[i].Y), Palette[i].Z);
                 Palette[i] /= maxVal;
             }
-            LoadFrame();
+           //LoadFrame();
         }
 
         private void Recording_OnFrameChanged(object sender, int e)
         {
-            LoadFrame();
+            //LoadFrame();
         }
         public class TrackedPt
         {
@@ -153,8 +153,8 @@ namespace Planes
                 features.keypoints = detector.Detect(img1);
                 features.descriptors = new Mat();
                 features.features = new Feature[features.keypoints.Length];
-                float invW = 1.0f / vf1.imageWidth;
-                float invH = 1.0f / vf1.imageHeight;
+                float invW = 1.0f / vf1.depthWidth;
+                float invH = 1.0f / vf1.depthHeight;
 
                 for (int idx = 0; idx < features.features.Length; ++idx)
                 {
@@ -323,9 +323,26 @@ namespace Planes
 
         static Mat MatFromVidFrame(Dopple.VideoFrame vf)
         {
-            int w = vf.ImageWidth;
-            int h = vf.imageHeight;
-            byte[] d = vf.imageData;
+            float[] depthIn = vf.GetDepthVals();
+            float[] depthVals =
+                VideoFrame.GetDepthInv(depthIn, vf.DepthWidth, vf.DepthHeight, out _);
+
+            float minVal = float.MaxValue, maxVal = 0;
+            for (int i = 0; i < depthVals.Length; ++i)
+            {
+                minVal = Math.Min(depthVals[i], minVal);
+                maxVal = Math.Max(depthVals[i], maxVal);
+            }
+
+            byte[] depthBVals = new byte[vf.depthHeight * vf.depthWidth];
+            for (int i = 0; i < depthVals.Length; ++i)
+            {
+                float v = ((depthVals[i] - minVal) / (maxVal - minVal)) * 255.0f;
+                depthBVals[i] = (byte)v;
+            }
+
+            int w = vf.depthWidth;
+            int h = vf.depthHeight;
             byte[,] data = new byte[w, h];
 
             int row = 0;
@@ -336,7 +353,7 @@ namespace Planes
             {
                 row = i / w;
                 column = i % w;
-                data[column, row] = d[i];
+                data[column, row] = depthBVals[i];
             }
             return Mat.FromArray<byte>(data);
         }

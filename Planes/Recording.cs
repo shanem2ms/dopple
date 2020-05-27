@@ -21,6 +21,8 @@ namespace Dopple
             set
             {
                 curFrameIdx = value;
+                if (curFrameIdx < 0)
+                    curFrameIdx = 0;
                 if (curFrameIdx >= Frames.Count)
                     curFrameIdx = Frames.Count - 1;
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("CurrentFrameIdx"));

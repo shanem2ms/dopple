@@ -66,40 +66,22 @@ namespace Planes
             float dist = 0.002f;
             float cdist = 0.003f;
             int pIdx = 0;
-            float thresh = 0.25f;
             foreach (var feature in features.features)
             {
                 Vector3 color = OpenCV.Palette[(pIdx++) % 64];
-                if (feature.next == null)
-                    continue;
+
                 float x = feature.pt.X;
                 float y = feature.pt.Y;
-
-                float d = feature.dist;
-                if (d > thresh)
-                    continue;
-
-                d /= thresh;
-                Vector3 dcolor = new Vector3(1, 0, 0) * d +
-                    new Vector3(0, 0, 1) * (1 - d);
-
-                float nx = feature.next.pt.X;
-                float ny = feature.next.pt.Y;
-                if (frameOffset == 1)
-                {
-                    x = nx;
-                    y = ny;
-                }
 
                 cIdx = (uint)qpts.Count();
                 qpts.Add(new Vector3(x - cdist, y - cdist, 0f));
                 qpts.Add(new Vector3(x + cdist, y - cdist, 0f));
                 qpts.Add(new Vector3(x - cdist, y + cdist, 0f));
                 qpts.Add(new Vector3(x + cdist, y + cdist, 0f));
-                colors.Add(dcolor);
-                colors.Add(dcolor);
-                colors.Add(dcolor);
-                colors.Add(dcolor);
+                colors.Add(color);
+                colors.Add(color);
+                colors.Add(color);
+                colors.Add(color);
                 ind.Add(cIdx);
                 ind.Add(cIdx + 1);
                 ind.Add(cIdx + 2);

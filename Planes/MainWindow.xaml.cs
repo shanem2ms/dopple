@@ -31,10 +31,13 @@ namespace Planes
     {
 
         public Dopple.Recording ActiveRecording => App.Recording;
-        IRenderer[] renderers = new IRenderer[2] {
+        IRenderer[] renderers = new IRenderer[3] {
                 new VideoRenderer(),
-                new DepthRenderer() };
+                new DepthRenderer(),
+                new PtsRenderer() };
         System.Timers.Timer renderTimer = new System.Timers.Timer();
+
+        public Settings Settings => App.Settings;
 
         IRenderer ar;
 
@@ -44,7 +47,7 @@ namespace Planes
             InitializeComponent();
             foreach (var r in renderers)
                 r.Invalidate = OnInvalidate;
-            ar = renderers[1];
+            ar = renderers[2];
         }
 
         void OnInvalidate()

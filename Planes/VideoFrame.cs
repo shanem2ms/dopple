@@ -55,6 +55,12 @@ namespace Dopple
         }
 
         [DllImport("ptslib.dll")]
+        public static extern void DepthInvFillNAN(IntPtr pDepthBuffer, IntPtr pOut, int depthWidth, int depthHeight);
+
+        [DllImport("ptslib.dll")]
+        public static extern float DepthEdge(IntPtr pDepthBuffer, IntPtr pOutEdges, int depthWidth, int depthHeight, int blur, int maxPts);
+
+        [DllImport("ptslib.dll")]
         public static extern void DepthBlur(IntPtr pDepthBuffer, IntPtr pOutEdges, int depthWidth, int depthHeight, int blur);
 
         [DllImport("ptslib.dll")]
@@ -89,8 +95,6 @@ namespace Dopple
                 0, depthHeight * depthWidth * 4);
             if (App.Settings.DepthLod > 0)
                 return GetDepthLods(depthVals, depthWidth, depthHeight)[App.Settings.DepthLod - 1];
-            if (App.Settings.Blur > 0)
-                return GetBlurredDepth(depthVals, depthWidth, depthHeight, App.Settings.Blur);
             else
                 return depthVals;
         }
@@ -179,7 +183,21 @@ namespace Dopple
             return pos;
         }
 
-       
+
+        public static float []GetDepthInv(float[] depthVals, int width, int height, out float avgVal)
+        {
+            IntPtr depthPtr = Marshal.AllocHGlobal(width * height * 4);
+            IntPtr depthOut = Marshal.AllocHGlobal(width * height * 4);
+            Marshal.Copy(depthVals, 0, depthPtr, depthVals.Length);
+            avgVal = DepthEdge(depthPtr, depthOut, width, height, App.Settings.Blur, 500);
+
+            float[] outVals = new float[width * height];
+            Marshal.Copy(depthOut, outVals, 0, outVals.Length);
+            Marshal.FreeHGlobal(depthPtr);
+            Marshal.FreeHGlobal(depthOut);
+            return outVals;
+        }
+
 
         public float MaxEdge { get; set; }
 

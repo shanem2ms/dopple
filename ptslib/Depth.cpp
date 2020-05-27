@@ -2,6 +2,7 @@
 #include "pch.h"
 #include <cmath>
 #include <vector>
+#include <set>
 #include <map>
 #include <memory>
 #include <algorithm>
@@ -74,6 +75,147 @@ extern "C"
 
 extern "C"
 {
+    struct DVal
+    {
+        float val;
+        float weight;
+        bool isnan;
+    };
+
+    __declspec (dllexport) void DepthInvFillNAN(float* dbuf, float* outpts, int depthWidth, int depthHeight)
+    {
+        std::vector<DVal> dvals;
+        dvals.reserve(depthWidth * depthHeight);
+        float* dend = dbuf + (depthWidth * depthHeight);
+
+        for (float* dptr = dbuf; dptr != dend; ++dptr)
+        {
+            DVal d;
+            d.weight = 0;
+            if (std::isnan(*dptr) || std::isinf(*dptr))
+            {
+                d.isnan = true;
+                d.val = 0;
+            }
+            else
+            {
+                d.isnan = false;
+                d.val = 1.0f / *dptr;
+            }
+
+            dvals.push_back(d);
+        }
+
+        for (int y = 0; y < depthHeight; ++y)
+        {
+            {
+                DVal* dptr = &dvals[y * depthWidth];
+                DVal* dend = &dvals[(y + 1) * depthWidth];
+                while (dptr->isnan && dptr != dend) ++dptr;
+                float val = NAN;
+                float dist = 0;
+                while (dptr != dend)
+                {
+                    if (!dptr->isnan)
+                    {
+                        val = dptr->val;
+                        dist = 2;
+                    }
+                    else
+                    {
+                        dptr->val += val / dist;
+                        dptr->weight += 1.0f / dist;
+                        dist += 1.0f;
+                    }
+                    ++dptr;
+                }
+            }
+
+            {
+                DVal* dptr = &dvals[(y + 1) * depthWidth] - 1;
+                DVal* dend = &dvals[y * depthWidth] - 1;
+                while (dptr != dend && dptr->isnan) --dptr;
+                float val = NAN;
+                float dist = 0;
+                while (dptr != dend)
+                {
+                    if (!dptr->isnan)
+                    {
+                        val = dptr->val;
+                        dist = 2;
+                    }
+                    else
+                    {
+                        dptr->val += val / dist;
+                        dptr->weight += 1.0f / dist;
+                        dist += 1.0f;
+                    }
+                    --dptr;
+                }
+            }
+        }
+
+        for (int x = 0; x < depthWidth; ++x)
+        {
+            size_t dstep = depthWidth;
+            {
+                DVal* dptr = dvals.data() + x;
+                DVal* dend = dvals.data() + (depthHeight * depthWidth + x);
+                while (dptr->isnan && dptr != dend) dptr += dstep;
+                float val = NAN;
+                float dist = 0;
+                while (dptr != dend)
+                {
+                    if (!dptr->isnan)
+                    {
+                        val = dptr->val;
+                        dist = 2;
+                    }
+                    else
+                    {
+                        dptr->val += val / dist;
+                        dptr->weight += 1.0f / dist;
+                        dist += 1.0f;
+                    }
+                    dptr += dstep;
+                }
+            }
+
+            {
+                DVal* dptr = dvals.data() + ((depthHeight - 1) * depthWidth + x); 
+                DVal* dend = dvals.data() + x - depthWidth;
+
+                while (dptr != dend && dptr->isnan) dptr -= dstep;
+                float val = NAN;
+                float dist = 0;
+                while (dptr != dend)
+                {
+                    if (!dptr->isnan)
+                    {
+                        val = dptr->val;
+                        dist = 2;
+                    }
+                    else
+                    {
+                        dptr->val += val / dist;
+                        dptr->weight += 1.0f / dist;
+                        dist += 1.0f;
+                    }
+                    dptr -= dstep;
+                }
+            }
+        }
+
+        float* outptr = outpts;
+        for (DVal &dv : dvals)
+        {
+            *outptr = dv.isnan ? dv.val / dv.weight :
+                dv.val;
+            outptr++;
+        }
+    }
+
+
     __declspec (dllexport) void DepthBlur(float* dbuf, float* outpts, int depthWidth, int depthHeight, int blur)
     {
         std::vector<float> dinv;
@@ -160,6 +302,61 @@ extern "C"
         }
         memcpy(outpts, dinv.data(), dinv.size() * sizeof(float));
     }
+
+    struct EdgePt
+    {
+        float* ptr;
+        float val;
+
+        bool operator < (const EdgePt &rhs) const
+        { return val < rhs.val; }
+    };
+
+    __declspec (dllexport) float DepthEdge(float* dbuf, float* outpts, int depthWidth, int depthHeight, int blur, int maxPts)
+    {
+        std::vector<float> invPts(depthWidth * depthHeight);
+
+        DepthInvFillNAN(dbuf, invPts.data(), depthWidth, depthHeight);
+        std::vector<float> blurPts(depthWidth * depthHeight);
+        DepthBlur(invPts.data(), blurPts.data(), depthWidth, depthHeight, blur);
+
+        float* outPtr = outpts;
+        auto itOrigPt = invPts.begin();
+        float* maskPtr = dbuf;
+
+        std::multiset<EdgePt> edgePts;
+        memset(outpts, 0, sizeof(float) * depthHeight * depthWidth);
+        for (auto itBlurPt = blurPts.begin(); itBlurPt !=
+            blurPts.end(); ++itBlurPt, ++itOrigPt, ++outPtr, ++maskPtr)
+        {
+            if (!std::isnan(*maskPtr) && !std::isinf(*maskPtr))
+            {
+                float d = fabs(*itBlurPt - *itOrigPt);
+                if (edgePts.size() < maxPts || d > edgePts.begin()->val)
+                {
+                    EdgePt ep;
+                    ep.val = d;
+                    ep.ptr = outPtr;
+                    edgePts.insert(ep);
+
+                    if (edgePts.size() > maxPts)
+                    {
+                        edgePts.erase(edgePts.begin());
+                    }
+                }
+            }
+        }
+        float avgVal = 0;
+        for (auto iEpt = edgePts.begin(); iEpt != edgePts.end(); ++iEpt)
+        {
+            *iEpt->ptr = iEpt->val;
+            avgVal += iEpt->val;
+        }
+
+        avgVal /= (float)(edgePts.size());
+        return avgVal;
+    }
+        
 
     __declspec (dllexport) void ImageBlur(unsigned char* ibuf, unsigned char* outpts, int imageWidth, int imageHeight, int blur)
     {

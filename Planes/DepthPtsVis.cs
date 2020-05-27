@@ -64,11 +64,7 @@ namespace Planes
                 curFrame = App.Recording.Frames.Count - 1;
             Dopple.Frame f = App.Recording.Frames[curFrame];
 
-            Tuple<int, int> []matches = App.ptCloudAligner.Matches;
-
             bool firstFrame = this.frameOffset == 0;
-
-            var matchHash = matches.Select(m => firstFrame ? m.Item1 : m.Item2).ToHashSet();
 
             this.videoMatrix = f.vf.ProjectionMat;
             Dopple.VideoFrame vf = f.vf;
@@ -96,7 +92,6 @@ namespace Planes
                 float pixel = 1.0f / f.vf.DepthWidth;
                 foreach (var kv in pts)
                 {
-                    bool isMatch = matchHash.Contains(kv.Key);
                     var p = kv.Value;
                     if (float.IsInfinity(p.pt.X))
                         continue;
@@ -121,9 +116,6 @@ namespace Planes
                                + Vector3.UnitY * dist);
                     qpts.Add(p.pt + Vector3.UnitX * dist
                                + Vector3.UnitY * dist);
-
-                    if (!isMatch)
-                        rgbcol = new Vector3(1.0f, 1.0f, 1.0f) * 0.25f;
 
                     rgbcol += (firstFrame ? new Vector3(1, 0, 0) : new Vector3(0, 0, 1)) * 0.35f;
 

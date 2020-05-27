@@ -43,8 +43,8 @@ namespace Planes
         float planeThreshold = 0.015f;
         float minDPVal = 0.9f;
         float maxCoverage = 10.0f;
-        int blur = 0;
-        int depthLod = 2;
+        int blur = 2;
+        int depthLod = 0;
 
         public event EventHandler<EventArgs> OnSettingsChanged;
 

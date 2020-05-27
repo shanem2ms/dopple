@@ -20,9 +20,9 @@ namespace Planes
         Vector3 viewOffset = Vector3.Zero;
         float viewScale = 1.0f;
 
+        VideoVis[] videoVis = new VideoVis[2];
         DepthVis[] depthVis = new DepthVis[2];
         RenderTarget[] quads = new RenderTarget[2];
-        MatchesVis[] matchesVis = new MatchesVis[2];
         Matrix4 rotMatrix = Matrix4.Identity;
 
         int currentWidth;
@@ -45,8 +45,8 @@ namespace Planes
 
             for (int i = 0; i < 2; ++i)
             {
+                videoVis[i] = new VideoVis(i); 
                 depthVis[i] = new DepthVis(i);
-                matchesVis[i] = new MatchesVis(i);
             }
             renderTimer.Start();
         }
@@ -58,7 +58,6 @@ namespace Planes
                 Matrix4 projection = Matrix4.CreateOrthographicOffCenter(0, 1, 0, 1, 1, 0);
                 Matrix4 modelview = Matrix4.CreateScale(viewScale) * Matrix4.CreateTranslation(-0.5f, -0.5f, 0) * Matrix4.CreateRotationZ(-(float)Math.PI / 2.0f) *
                     Matrix4.CreateTranslation(0.5f, 0.5f, 0) * Matrix4.CreateTranslation(Vector3.Multiply(viewOffset, new Vector3(2, -1, 1)));
-
                 return modelview * projection;
             }
         }
@@ -73,14 +72,14 @@ namespace Planes
 
             GL.Clear(ClearBufferMask.ColorBufferBit);
             GL.Clear(ClearBufferMask.DepthBufferBit);
-            GL.Disable(EnableCap.Blend);
+            GL.Enable(EnableCap.Blend);
             GL.Disable(EnableCap.DepthTest);
             quads[0].Use();
+            videoVis[0].Render(viewProj);
             depthVis[0].Render(viewProj);
-            matchesVis[0].Render(viewProj);
             quads[1].Use();
+            videoVis[1].Render(viewProj);
             depthVis[1].Render(viewProj);
-            matchesVis[1].Render(viewProj);
             FrameBuffer.BindNone();
             GL.Disable(EnableCap.Blend);
             GL.Disable(EnableCap.DepthTest);
