@@ -65,7 +65,6 @@ namespace Planes
             Dopple.Frame f = App.Recording.Frames[curFrame];
 
             bool firstFrame = this.frameOffset == 0;
-
             this.videoMatrix = f.vf.ProjectionMat;
             Dopple.VideoFrame vf = f.vf;
             _ImageTexture.LoadImageFrame(vf.ImageWidth, vf.ImageHeight,
