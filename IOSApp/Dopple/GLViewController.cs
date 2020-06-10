@@ -12,6 +12,7 @@ using GLKit;
 using OpenTK.Graphics.ES20;
 using ARKit;
 using OpenTK;
+using CoreMotion;
 
 namespace Dopple
 {
@@ -59,6 +60,7 @@ namespace Dopple
         private OpenTK.Matrix4 faceWorldViewProj;
         double faceTimeStamp = 0;
         double frameTimeStamp = 0;
+        CMMotionManager cmMotionManager = new CMMotionManager();
 
         ARSession arSession;
 
@@ -77,12 +79,34 @@ namespace Dopple
             return UIStatusBarStyle.LightContent;
         }
 
+        struct Accel3DPoint
+        {
+            public double X, Y, Z;
+
+            public Accel3DPoint(double x, double y, double z)
+            {
+                X = x;
+                Y = y;
+                Z = z;
+            }
+
+            public override string ToString() => $"X = {X}, Y = {Y}, Z = {Z}";
+        }
+
+        List<Accel3DPoint> samples = new List<Accel3DPoint>();
         public override void ViewDidLoad()
         {
             base.ViewDidLoad();
             arSession = new ARSession();
             this.vidSclBtn.SetTitle($"Vid {downSampleAmt}x",
                 UIControlState.Normal);
+            cmMotionManager.AccelerometerUpdateInterval = 0.01;
+            NSOperationQueue queue;
+            queue = new NSOperationQueue();
+            cmMotionManager.StartAccelerometerUpdates(queue, (data, error) => {
+                var point = new Accel3DPoint(data.Acceleration.X, data.Acceleration.Y, data.Acceleration.Z);
+                samples.Add(point);
+            });
         }
 
         public override void ViewWillAppear(bool animated)
