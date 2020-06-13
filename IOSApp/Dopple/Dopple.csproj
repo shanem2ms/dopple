@@ -9,6 +9,7 @@
     <RootNamespace>Dopple</RootNamespace>
     <AssemblyName>Dopple</AssemblyName>
     <IPhoneResourcePrefix>Resources</IPhoneResourcePrefix>
+    <ProvisioningType>automatic</ProvisioningType>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|iPhoneSimulator' ">
     <DebugSymbols>true</DebugSymbols>
@@ -28,17 +29,19 @@
     <MtouchArch>x86_64</MtouchArch>
     <MtouchHttpClientHandler>NSUrlSessionHandler</MtouchHttpClientHandler>
     <PlatformTarget>x86</PlatformTarget>
-<MtouchExtraArgs>-cxx -gcc_flags "-L${ProjectDir} -lptslibios -force_load ${ProjectDir}/libptslibios.a"</MtouchExtraArgs>
+    <MtouchExtraArgs>-cxx -gcc_flags "-L${ProjectDir} -lptslibios -force_load ${ProjectDir}/libptslibios.a"</MtouchExtraArgs>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|iPhone' ">
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
     <OutputPath>bin\iPhone\Release</OutputPath>
-    <DefineConstants></DefineConstants>
-    <DefineConstants></DefineConstants>
+    <DefineConstants>
+    </DefineConstants>
+    <DefineConstants>
+    </DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <CodesignKey>iPhone Developer</CodesignKey>
+    <CodesignKey>Apple Development: Shane Morrison (N29TFRV4SC)</CodesignKey>
     <MtouchFloat32>true</MtouchFloat32>
     <CodesignEntitlements>Entitlements.plist</CodesignEntitlements>
     <MtouchLink>SdkOnly</MtouchLink>
@@ -50,10 +53,13 @@
     <CrashReportingApiKey>
     </CrashReportingApiKey>
     <MtouchDebug>false</MtouchDebug>
-    <IpaIncludeArtwork></IpaIncludeArtwork>
-    <IpaPackageName></IpaPackageName>
+    <IpaIncludeArtwork>
+    </IpaIncludeArtwork>
+    <IpaPackageName>
+    </IpaPackageName>
     <SignAssembly>false</SignAssembly>
     <DelaySign>false</DelaySign>
+    <CodesignProvision>VS: WildCard Development</CodesignProvision>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|iPhoneSimulator' ">
     <DebugType>pdbonly</DebugType>
@@ -76,7 +82,7 @@
     <DefineConstants>DEBUG;ENABLE_TEST_CLOUD;</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <CodesignKey>iPhone Developer</CodesignKey>
+    <CodesignKey>Apple Development: Shane Morrison (N29TFRV4SC)</CodesignKey>
     <DeviceSpecificBuild>true</DeviceSpecificBuild>
     <MtouchDebug>true</MtouchDebug>
     <MtouchNoSymbolStrip>true</MtouchNoSymbolStrip>
@@ -89,7 +95,10 @@
     <MtouchArch>ARM64</MtouchArch>
     <MtouchHttpClientHandler>NSUrlSessionHandler</MtouchHttpClientHandler>
     <PlatformTarget>x86</PlatformTarget>
-    <MtouchExtraArgs>-cxx -gcc_flags "-L${ProjectDir} -lptslibios -force_load ${ProjectDir}/libptslibios.a"</MtouchExtraArgs>
+    <MtouchExtraArgs>
+    </MtouchExtraArgs>
+    <CodesignProvision>VS: WildCard Development</CodesignProvision>
+    <MtouchEnableSGenConc>true</MtouchEnableSGenConc>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'ReleaseNoOpt|iPhoneSimulator'">
     <OutputPath>bin\iPhoneSimulator\ReleaseNoOpt\</OutputPath>
@@ -144,7 +153,6 @@
     <Content Include="Shaders\FaceMesh.vert" />
     <Content Include="Shaders\DualEye.frag" />
     <Content Include="Shaders\DualEye.vert" />
-    <None Include="libptslibios.a" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="DualEyeViewController.cs" />

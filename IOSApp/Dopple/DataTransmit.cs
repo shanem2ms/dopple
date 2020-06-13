@@ -37,7 +37,9 @@ namespace Dopple
         public bool IsRecording { get { return isRecording; } set { isRecording = value; SetRecording(); } }
         public bool LiveTransmit { get { return liveTransmit; } set { liveTransmit = value; if (liveTransmit) SetLiveMode(); } }
         FileStream fileStream = null;
-        Dictionary<double, Frame> currentFrames = new Dictionary<double, Frame>();
+        SortedDictionary<double, Frame> currentFrames = new SortedDictionary<double, Frame>();
+        SortedDictionary<double, MotionPoint> motionPoints = new SortedDictionary<double, MotionPoint>();
+
 
         public void AddARFrmHeader(double timeStamp, ARFrmHeader hdr)
         {
@@ -55,6 +57,14 @@ namespace Dopple
                     frame.hdr = hdr;
                     currentFrames.Add(timeStamp, frame);
                 }
+            }
+        }
+
+        public void AddMotionPoint(MotionPoint mp)
+        {
+            lock (motionPoints)
+            {
+                motionPoints.Add(mp.timeStamp, mp);
             }
         }
 
@@ -91,6 +101,23 @@ namespace Dopple
                 if (//frame.IsComplete ||
                     (curTimeStamp - frame.timeStamp) > sendLatency)
                 {
+                    lock (motionPoints)
+                    {
+                        List<double> keys = new List<double>(motionPoints.Keys);
+                        int idx = keys.BinarySearch(frame.timeStamp);
+                        if (idx < 0) idx = (~idx - 1);
+                        if (idx > 0)
+                        {
+                            List<double> rgKeys = keys.GetRange(0, idx);
+                            List<MotionPoint> mpList = new List<MotionPoint>();
+                            foreach (double ts in rgKeys)
+                            {
+                                mpList.Add(motionPoints[ts]);
+                                motionPoints.Remove(ts);
+                            }
+                            frame.motionPoints = mpList.ToArray();
+                        }
+                    }
                     if (frame.HasDepth || !sendOnlyDepthFrames) SendMessage(104, frame);
                     this.currentFrames.Remove(frame.timeStamp);
                 }

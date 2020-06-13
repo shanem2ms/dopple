@@ -16,19 +16,21 @@ using CoreMotion;
 
 namespace Dopple
 {
+#if NATIVELIB
     public class Lib
     {
         [DllImport("__Internal")]
         public static extern void SetPlaneConstants(float minDist, float splitThreshold, float minDPVal);
     }
+#endif
     public partial class GLViewController : GLKViewController
     {
-        #region Constructors
+#region Constructors
         protected GLViewController(IntPtr handle) : base(handle)
         {
             // Note: this .ctor should not contain any initialization logic.
         }
-        #endregion
+#endregion
 
         /// <summary>
         /// The program used for drawing the triangle.
@@ -82,30 +84,40 @@ namespace Dopple
         struct Accel3DPoint
         {
             public double X, Y, Z;
+            public double timeStamp;
 
-            public Accel3DPoint(double x, double y, double z)
+            public Accel3DPoint(double x, double y, double z, double t)
             {
                 X = x;
                 Y = y;
                 Z = z;
+                timeStamp = t;
             }
 
             public override string ToString() => $"X = {X}, Y = {Y}, Z = {Z}";
         }
-
-        List<Accel3DPoint> samples = new List<Accel3DPoint>();
+                
+        //List<Accel3DPoint> accelerometerSamples = new List<Accel3DPoint>();
+        //List<Accel3DPoint> gyroSamples = new List<Accel3DPoint>();
         public override void ViewDidLoad()
         {
             base.ViewDidLoad();
             arSession = new ARSession();
             this.vidSclBtn.SetTitle($"Vid {downSampleAmt}x",
                 UIControlState.Normal);
-            cmMotionManager.AccelerometerUpdateInterval = 0.01;
-            NSOperationQueue queue;
-            queue = new NSOperationQueue();
-            cmMotionManager.StartAccelerometerUpdates(queue, (data, error) => {
-                var point = new Accel3DPoint(data.Acceleration.X, data.Acceleration.Y, data.Acceleration.Z);
-                samples.Add(point);
+
+            cmMotionManager.DeviceMotionUpdateInterval = 0.01;
+            NSOperationQueue dmqueue;
+            dmqueue = new NSOperationQueue();
+            cmMotionManager.StartDeviceMotionUpdates(dmqueue, (data, error) => {
+                var point = new MotionPoint(data.UserAcceleration.X, data.UserAcceleration.Y, data.UserAcceleration.Z,
+                    data.RotationRate.x, data.RotationRate.y, data.RotationRate.z,
+                    data.Attitude.Quaternion.x,
+                    data.Attitude.Quaternion.y,
+                    data.Attitude.Quaternion.z,
+                    data.Attitude.Quaternion.w,
+                    data.Timestamp);
+                dt.AddMotionPoint(point);
             });
         }
 
@@ -127,7 +139,7 @@ namespace Dopple
         }
 
 
-        #region setup 
+#region setup 
 
         private void SetupGL()
         {
@@ -182,7 +194,7 @@ namespace Dopple
 
         }
 
-        #endregion
+#endregion
 
         public override void Update()
         {
@@ -236,7 +248,7 @@ namespace Dopple
             }
         }
 
-        #region touches
+#region touches
         
         partial void OnRecordBtnDown(UIButton sender)
         {
@@ -377,7 +389,7 @@ namespace Dopple
         }
 
 
-        #endregion
+#endregion
 
         private void TeardownAVCapture() { }
 
