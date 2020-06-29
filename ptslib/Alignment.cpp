@@ -49,6 +49,128 @@ struct Match
     long matchedIdx;
 };
 
+
+int Matches(Point3v* pts0, size_t npts0, Point3v* pts1, size_t npts1, int* matchidxs)
+{
+    KDTree::KDTree <3, ANode> kdtree;
+    size_t ptidx = 0;
+    for (Point3v* pt = pts0; pt < (pts0 + npts0); ++pt)
+    {
+        ANode an(*pt, ptidx++);
+        kdtree.insert(an);
+    }
+
+    KDTree::KDTree <3, ANode> kdtree2;
+    size_t ptidx2 = 0;
+    for (Point3v* pt = pts1; pt < (pts1 + npts1); ++pt)
+    {
+        ANode an(*pt, ptidx2++);
+        kdtree2.insert(an);
+    }
+
+    kdtree.optimize();
+    kdtree2.optimize();
+
+    size_t midx = 0;
+    std::vector<Match> matches;
+    matches.resize(npts0);
+    for (Match& m : matches) { m.idx = midx++; }
+
+    size_t mIdx = 0;
+    for (Point3v* pt = pts1; pt < (pts1 + npts1); ++pt)
+    {
+        ANode v1(*pt, 0);
+        auto itFound = kdtree.find_nearest(v1);
+        size_t idxfound = itFound.first->idx;
+        Match& match = matches[idxfound];
+        const Point3v& pt0 = pts0[idxfound];
+        ANode v2(pt0, 0);
+        auto itFound2 = kdtree2.find_nearest(v2);
+        if (itFound2.first->idx == mIdx)
+        {
+            Vec3v v3f = *pt - pt0;
+            vfloat distsq = lengthSquared(v3f);
+            if (match.matchedIdx < 0 ||
+                distsq < match.distsq)
+            {
+                match.distsq = distsq;
+                match.matchedIdx = mIdx;
+            }
+        }
+        mIdx++;
+    }
+
+    int* cmatch = matchidxs;
+    int nmatches = 0;
+    for (Match& m : matches)
+    {
+        if (m.matchedIdx < 0)
+            continue;
+        *cmatch++ = m.idx;
+        *cmatch++ = m.matchedIdx;
+        nmatches++;
+    }
+    return nmatches;
+}
+
+inline float powt(float v, int i)
+{
+    if (i == 1)
+        return v;
+    else return pow(v, i - 1);
+}
+
+float QuatEq(Quatf q, Vec3f v, Vec3f p)
+{
+    // Extract the vector part of the quaternion
+    Vec3f u(q[0], q[1], q[2]);
+
+    // Extract the scalar part of the quaternion
+    float s = q[3];
+
+    Vec3f c;
+    // Do the math
+    Vec3f result = 2.0f * dot(u, v) * u
+        + (s * s - dot(u, u)) * v
+        + 2.0f * s * gmtl::cross(c, u, v);
+
+    Vec3f dvec = result - p;
+    return lengthSquared(dvec);
+}
+
+Quatf DerivQuat(Quatf q, Vec3f v, Vec3f p)
+{
+    float qx = q[0], qy = q[1], qz = q[2], qw = q[3];
+    float vx = v[0], vy = v[1], vz = v[2];
+    float px = p[0], py = p[1], pz = p[2];
+
+    float dqx = 4 * (-pz * qz * vx + powt(qw, 2) * qx * powt(vx, 2) + powt(qx, 3) * powt(vx, 2) + qx * powt(qy, 2) * powt(vx, 2) +
+        qx * powt(qz, 2) * powt(vx, 2) - pz * qw * vy + powt(qw, 2) * qx * powt(vy, 2) + powt(qx, 3) * powt(vy, 2) + qx * powt(qy, 2) * powt(vy, 2) +
+        qx * powt(qz, 2) * powt(vy, 2) + pz * qx * vz + powt(qw, 2) * qx * powt(vz, 2) + powt(qx, 3) * powt(vz, 2) +
+        qx * powt(qy, 2) * powt(vz, 2) + qx * powt(qz, 2) * powt(vz, 2) + py * (-qy * vx + qx * vy + qw * vz) -
+        px * (qx * vx + qy * vy + qz * vz));
+
+    float dqy = 4 * (px * qy * vx + powt(qw, 2) * qy * powt(vx, 2) + powt(qx, 2) * qy * powt(vx, 2) + powt(qy, 3) * powt(vx, 2) + qy * powt(qz, 2) * powt(vx, 2) -
+        px * qx * vy + powt(qw, 2) * qy * powt(vy, 2) + powt(qx, 2) * qy * powt(vy, 2) + powt(qy, 3) * powt(vy, 2) +
+        qy * powt(qz, 2) * powt(vy, 2) - px * qw * vz + powt(qw, 2) * qy * powt(vz, 2) + powt(qx, 2) * qy * powt(vz, 2) + powt(qy, 3) * powt(vz, 2) +
+        qy * powt(qz, 2) * powt(vz, 2) + pz * (qw * vx - qz * vy + qy * vz) -
+        py * (qx * vx + qy * vy + qz * vz));
+
+    float dqz = 4 * (px * qz * vx + powt(qw, 2) * qz * powt(vx, 2) + powt(qx, 2) * qz * powt(vx, 2) + powt(qy, 2) * qz * powt(vx, 2) + powt(qz, 3) * powt(vx, 2) +
+        px * qw * vy + powt(qw, 2) * qz * powt(vy, 2) + powt(qx, 2) * qz * powt(vy, 2) + powt(qy, 2) * qz * powt(vy, 2) +
+        powt(qz, 3) * powt(vy, 2) - px * qx * vz + powt(qw, 2) * qz * powt(vz, 2) + powt(qx, 2) * qz * powt(vz, 2) + powt(qy, 2) * qz * powt(vz, 2) +
+        powt(qz, 3) * powt(vz, 2) - py * (qw * vx - qz * vy + qy * vz) -
+        pz * (qx * vx + qy * vy + qz * vz));
+
+    float dqw = 4 * (-py * qz * vx + powt(qw, 3) * powt(vx, 2) + qw * powt(qx, 2) * powt(vx, 2) + qw * powt(qy, 2) * powt(vx, 2) +
+        qw * powt(qz, 2) * powt(vx, 2) - py * qw * vy + powt(qw, 3) * powt(vy, 2) + qw * powt(qx, 2) * powt(vy, 2) + qw * powt(qy, 2) * powt(vy, 2) +
+        qw * powt(qz, 2) * powt(vy, 2) + py * qx * vz + powt(qw, 3) * powt(vz, 2) + qw * powt(qx, 2) * powt(vz, 2) +
+        qw * powt(qy, 2) * powt(vz, 2) + qw * powt(qz, 2) * powt(vz, 2) + pz * (qy * vx - qx * vy - qw * vz) -
+        px * (qw * vx - qz * vy + qy * vz));
+
+    return Quatf(dqx, dqy, dqz, dqw);
+}
+
 class PtScorer
 {
 
@@ -251,7 +373,7 @@ public:
         vfloat invlen = 1.0 / ptsStart.size();
 
         for (int i = 0; i < ptsStart.size(); ++i)
-        {            
+        {
             vfloat x_src = ptsEnd[i][0];
             vfloat y_src = ptsEnd[i][1];
             vfloat z_src = ptsEnd[i][2];
@@ -297,15 +419,15 @@ public:
             GetDerivatives2(ptsStart, ptsEnd, rot, trans, uScore, tScore);
             totalScore = fabs(length(uScore) + length(tScore));
             char tmp[1024];
-            //sprintf_s(tmp, "%f  [%f %f %f] r=%f [%f %f %f]\n", totalScore, tScore[0], tScore[1], tScore[2], uScore[3], uScore[0], uScore[1], uScore[2]);
-            //OutputDebugStringA(tmp);
+            sprintf_s(tmp, "%f  [%f %f %f] r=%f [%f %f %f]\n", totalScore, tScore[0], tScore[1], tScore[2], uScore[3], uScore[0], uScore[1], uScore[2]);
+            OutputDebugStringA(tmp);
             trans += tScore * dvals[0];
             rot[0] += uScore[0] * dvals[1];
             rot[1] += uScore[1] * dvals[1];
             rot[2] += uScore[2] * dvals[1];
             rot[3] += uScore[3] * dvals[2];
 
-            gmtl::normalize((Vec3f &)rot);
+            gmtl::normalize((Vec3f&)rot);
         }
 
         translate = trans;
@@ -317,7 +439,7 @@ public:
         const std::vector<Point3v>& ptsEnd,
         Vec3v& translate,
         Vec3f& rotate,
-        const Vec4f &dvals)
+        const Vec4f& dvals)
     {
         Vec3v trans(0, 0, 0);
         Vec3v rot(0, 0, 0);
@@ -486,12 +608,12 @@ public:
 
 extern "C" {
 
-    __declspec (dllexport) int GetNearest(Point3v* pts0, size_t ptCount0, Point3v* pts1, size_t ptCount1, int *outMatches)
+    __declspec (dllexport) int GetNearest(Point3v* pts0, size_t ptCount0, Point3v* pts1, size_t ptCount1, int* outMatches)
     {
         KDTree::KDTree <3, ANode> kdtree;
         size_t ptidx = 0;
 
-        for (Point3v *pt = pts0; pt != (pts0 + ptCount0); ++pt)
+        for (Point3v* pt = pts0; pt != (pts0 + ptCount0); ++pt)
         {
             ANode an(*pt, ptidx++);
             kdtree.insert(an);
@@ -503,7 +625,7 @@ extern "C" {
         std::vector<Match> matches;
         matches.resize(ptCount0);
         for (Match& m : matches) { m.idx = midx++; }
-        
+
         size_t mIdx = 0;
         for (Point3v* pt1 = pts1; pt1 != (pts1 + ptCount1); ++pt1)
         {
@@ -569,10 +691,16 @@ extern "C" {
         delete pthis;
     }
 
+    __declspec (dllexport) int FindMatches(vfloat* pts0, size_t ptCount0, vfloat* pts1, size_t ptCount1,
+        int* matches)
+    {
+        return Matches((Point3v*)pts0, ptCount0, (Point3v*)pts1, ptCount1, matches);
+    }
+
     inline float randfl()
     {
         const float invRand = 1.0f / RAND_MAX;
-        return rand()* invRand;
+        return rand() * invRand;
     }
 
     const int cnt = 20;
@@ -581,44 +709,157 @@ extern "C" {
     const float vscale = 0.1f / cnt;;
     std::vector<int> scores;
 
-    __declspec (dllexport) void BestFit(vfloat* pts0, size_t ptCount0, vfloat* pts1, size_t ptCount1,
-        Vec3f* outTranslate,
-        Vec4f* outRotate)
+    static inline Vec3f RotX(float a, Vec3f v)
     {
-        Point3v *p0 = (Point3v*)pts0;
-        std::vector<Point3v> pvec0(p0, p0 + ptCount0);
+        float cosA = (float)cos(a);
+        float sinA = (float)sin(a);
+        return Vec3f(v[0], v[1] * cosA - v[2] * sinA, v[1] * sinA + v[2] * cosA);
+    }
 
-        Point3v* p1 = (Point3v*)pts1;
-        std::vector<Point3v> pvec1(p1, p1 + ptCount1);
+    static Vec3f RotY(float b, Vec3f v)
+    {
+        float cosB = (float)cos(b);
+        float sinB = (float)sin(b);
+        return Vec3f(v[0] * cosB - v[2] * sinB, v[1], v[0] * sinB + v[2] * cosB);
+    }
+
+
+    __declspec (dllexport) void BestFit(vfloat* _pts0, size_t ptCount0, vfloat* _pts1, size_t ptCount1,
+        Vec3f* outTranslate,
+        Vec3f* outRotate)
+    {
+        Point3v* pts0 = (Point3v*)_pts0;
+        Point3v* pts1 = (Point3v*)_pts1;
+
+        std::vector<int> matches;
+        matches.resize(ptCount0 + ptCount1);
+        int nmatches = Matches(pts0, ptCount0, pts1, ptCount1, matches.data());
+
+        std::vector<Point3v> pvec0;
+        std::vector<Point3v> pvec1;
+
+        for (int idx = 0; idx < nmatches; idx++)
+        {
+            pvec0.push_back(pts0[matches[idx * 2]]);
+            pvec1.push_back(pts1[matches[idx * 2 + 1]]);
+        }
+       
+        {
+            float totalDist2 = 0;
+            for (size_t idx = 0; idx < pvec0.size(); ++idx)
+            {
+                Vec3f v = (pvec1[idx] - pvec0[idx]);
+                totalDist2 += lengthSquared(v);
+            }
+
+            char tmp[1024];
+            sprintf_s(tmp, "O=%f\n", totalDist2);
+            OutputDebugStringA(tmp);
+        }
+       
+        Vec3f bestOffset;
+        {
+            Vec3f t(0, 0, 0);
+
+            for (int tIdx = 0; tIdx < 10; ++tIdx)
+            {
+                Vec3f dt(0, 0, 0);
+                for (size_t idx = 0; idx < pvec0.size(); ++idx)
+                {
+                    Vec3f d(0, 0, 0);
+                    for (int pIdx = 0; pIdx < 3; ++pIdx)
+                    {
+                        d[pIdx] = -2 * (-t[pIdx] + pvec1[idx][pIdx] - pvec0[idx][pIdx]);
+                    }
+
+                    dt += d;
+                }
+
+                dt /= (float)pvec0.size();
+                t -= dt * 0.5f;
+            }
+
+            bestOffset = t;
+        }
         
-        Vec3f translate2 = Vec3f(0, 0, 0);
-        Vec4f rotate2 = Vec4f(0, 0, 1, 0);
-        float r = -5.50000000f, v = -0.04f;
-        if (scores.size() == 0)
-            scores.resize(dcnt * dcnt);
-
-        //for (int ridx = -cnt; ridx < cnt; ++ridx)
-        //{            
-           // for (int vidx = -cnt; vidx < cnt; ++vidx)
-            //{
-                translate2 = Vec3f(0, 0, 0);
-                rotate2 = Vec4f(0, 0, 1, 0);
-                //r = (float)ridx * rscale;
-                //v = (float)vidx * vscale;
-                float minval = PTCloudAlign::BestFit2(pvec0, pvec1,
-                    translate2, rotate2, Vec4f(-0.1f, r, v, 0));
-                char tmp[1024];
-                sprintf_s(tmp, "minval: %f\n", minval);
-                    OutputDebugStringA(tmp);
-                           // if (minval < 0.01f)
-               // {
-                //    scores[(ridx + cnt) * dcnt + vidx + cnt]++;
-               // }
-            //}
-        //}
+        for (size_t idx = 0; idx < pvec0.size(); ++idx)
+        {
+            pvec1[idx] -= bestOffset;
+        }
         
+        float rx = 0;
+        for (int tIdx = 0; tIdx < 10; ++tIdx)
+        {
+            float drx = 0;
+            float cosrx = cos(rx);
+            float sinrx = sin(rx);
+            for (size_t idx = 0; idx < pvec0.size(); ++idx)
+            {
+                drx += 2 * ((-pvec0[idx][2] * pvec1[idx][1] + pvec0[idx][1] * pvec1[idx][2]) * cosrx 
+                    + (pvec0[idx][1] * pvec1[idx][1] + pvec0[idx][2] * pvec1[idx][2]) * sinrx);
+            }
 
-        *outTranslate = translate2;
+            drx /= (float)pvec0.size();
+            rx -= drx * 0.05f;
+        }
+
+        for (size_t idx = 0; idx < pvec0.size(); ++idx)
+        {
+            pvec1[idx] = RotX(rx, pvec1[idx]);
+        }
+
+        float ry = 0;
+        for (int tIdx = 0; tIdx < 10; ++tIdx)
+        {
+            float dry = 0;
+            float cosry = cos(ry);
+            float sinry = sin(ry);
+            for (size_t idx = 0; idx < pvec0.size(); ++idx)
+            {
+                dry += 2 * ((-pvec0[idx][2] * pvec1[idx][0] + pvec0[idx][0] * pvec1[idx][2]) * cosry +
+                    (pvec0[idx][0] * pvec1[idx][0] + pvec0[idx][2] * pvec1[idx][2]) * sinry);
+            }
+
+            dry /= (float)pvec0.size();
+            ry -= dry * 0.05f;
+        }
+
+        for (size_t idx = 0; idx < pvec0.size(); ++idx)
+        {
+            pvec1[idx] = RotY(rx, pvec1[idx]);
+        }
+
+        float rz = 0;
+        for (int tIdx = 0; tIdx < 10; ++tIdx)
+        {
+            float drz = 0;
+            float cosrz = cos(rz);
+            float sinrz = sin(rz);
+            for (size_t idx = 0; idx < pvec0.size(); ++idx)
+            {
+                drz += 2 * ((-pvec0[idx][1] * pvec1[idx][0] + pvec0[idx][0] * pvec1[idx][1]) * cosrz + 
+                    (pvec0[idx][0] * pvec1[idx][0] + pvec0[idx][1] * pvec1[idx][1]) * sinrz);
+            }
+
+            drz /= (float)pvec0.size();
+            rz -= drz * 0.05f;
+        }
+
+        {
+            float totalDist2 = 0;
+            for (size_t idx = 0; idx < pvec0.size(); ++idx)
+            {
+                Vec3f v = (pvec1[idx] - pvec0[idx]);
+                totalDist2 += lengthSquared(v);
+            }
+
+            char tmp[1024];
+            sprintf_s(tmp, "O=%f\n", totalDist2);
+            OutputDebugStringA(tmp);
+        }
+
+        Vec3f rotate2(rx, ry, rz);
+        *outTranslate = -bestOffset;
         *outRotate = rotate2;
     }
 

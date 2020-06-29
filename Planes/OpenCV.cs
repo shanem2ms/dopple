@@ -15,64 +15,7 @@ using System.Windows.Markup;
 using System.Runtime.CompilerServices;
 
 namespace Planes
-{
-    class DPEngine
-    {
-        [DllImport("ptslib.dll")]
-        public static extern IntPtr CreatePtCloudAlign(IntPtr m_pts0, uint ptCount0, IntPtr m_pts1, uint ptCount1);
-
-        [DllImport("ptslib.dll")]
-        public static extern int GetNearest(IntPtr pts0, uint ptCount0, IntPtr pts1, uint ptCount1, IntPtr outMatches);
-
-        [DllImport("ptslib.dll")]
-        public static extern int AlignStep(IntPtr aligner, IntPtr outmatrix);
-
-        [DllImport("ptslib.dll")]
-        public static extern void FreePtCloudAlign(IntPtr aligner);
-
-        [DllImport("ptslib.dll")]
-        public static extern void BestFit(IntPtr pts0, uint ptCount0, IntPtr pts1, uint ptCount1, IntPtr outTranslate,
-            IntPtr outRotate);
-
-        [DllImport("ptslib.dll")]
-        public static extern void CalcScores();
-
-
-        public static IntPtr AllocVec3Array(Vector3[] pos)
-        {
-
-            IntPtr mpts0 = Marshal.AllocHGlobal(pos.Length * 3 * sizeof(float));
-            CopyVec3Array(pos, mpts0);
-            return mpts0;
-        }
-
-        public static void CopyVec3Array(Vector3[] pos, IntPtr mpts0)
-        {
-            float[] vals = new float[pos.Length * 3];
-            for (int idx = 0; idx < pos.Length; ++idx)
-            {
-                vals[idx * 3] = pos[idx].X;
-                vals[idx * 3 + 1] = pos[idx].Y;
-                vals[idx * 3 + 2] = pos[idx].Z;
-            }
-            Marshal.Copy(vals, 0, mpts0, vals.Length);
-        }
-
-
-        public static Matrix4 MatrixDToF(Matrix4d m)
-        {
-            return new Matrix4(Vector4DtoF(m.Row0),
-                Vector4DtoF(m.Row1),
-                Vector4DtoF(m.Row2),
-                Vector4DtoF(m.Row3));
-        }
-
-        public static Vector4 Vector4DtoF(Vector4d v)
-        {
-            return new Vector4((float)v.X, (float)v.Y, (float)v.Z, (float)v.W);
-        }
-    }
-
+{   
     public class OpenCV
     {
         public class Tracked

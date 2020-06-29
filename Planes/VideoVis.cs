@@ -71,7 +71,7 @@ namespace Planes
 
         public void Render(Matrix4 viewProj)
         {
-            if (hasNewFrame)
+            if (hasNewFrame && App.Recording.Frames.Count > 0)
             {
                 int curFrame = App.Recording.CurrentFrameIdx + this.frameOffset;
                 if (curFrame >= App.Recording.Frames.Count)

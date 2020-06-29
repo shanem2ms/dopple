@@ -456,6 +456,7 @@ extern "C"
         int dsw = depthWidth;
         int dw = depthWidth / 2;
         int dh = depthHeight / 2;
+        const float* osrc = dinv.data();
         float* dsrc = dinv.data();
         float* dptr = outpts;
         while (dw >= 16)

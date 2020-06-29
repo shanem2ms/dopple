@@ -114,15 +114,21 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="Aligner.cs" />
     <Compile Include="DepthPtsVis.cs" />
     <Compile Include="DepthVis.cs" />
+    <Compile Include="DeviceMotionVis.cs" />
+    <Compile Include="DeviceTrackerVis.cs" />
     <Compile Include="MatchesVis.cs" />
     <Compile Include="MatchVis.cs" />
+    <Compile Include="MotionRenderer.cs" />
     <Compile Include="OpenCV.cs" />
     <Compile Include="PtCloudAligner.cs" />
     <Compile Include="PtsRenderer.cs" />
     <Compile Include="Recording.cs" />
     <Compile Include="Selection.cs" />
+    <Compile Include="TcpConnect.cs" />
+    <Compile Include="TcpLib.cs" />
     <Compile Include="VideoFrame.cs" />
     <Compile Include="DepthRenderer.cs" />
     <Compile Include="VideoRenderer.cs" />

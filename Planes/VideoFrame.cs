@@ -189,7 +189,8 @@ namespace Dopple
             IntPtr depthPtr = Marshal.AllocHGlobal(width * height * 4);
             IntPtr depthOut = Marshal.AllocHGlobal(width * height * 4);
             Marshal.Copy(depthVals, 0, depthPtr, depthVals.Length);
-            avgVal = DepthEdge(depthPtr, depthOut, width, height, App.Settings.Blur, 500);
+            avgVal = 0;
+            DepthInvFillNAN(depthPtr, depthOut, width, height);
 
             float[] outVals = new float[width * height];
             Marshal.Copy(depthOut, outVals, 0, outVals.Length);
@@ -208,7 +209,7 @@ namespace Dopple
 
             int totalFloats = 0;
             int nLods = 0;
-            while (dw >= 16)
+            while (dw >= 32)
             {
                 dw /= 2;
                 dh /= 2;
@@ -240,7 +241,7 @@ namespace Dopple
 
                 lods[i] = new float[dw * dh];
                 Array.Copy(alllods, offset, lods[i], 0, dw * dh);
-                offset = dw * dh; 
+                offset += dw * dh; 
             }
 
             return lods;
@@ -428,7 +429,7 @@ namespace Dopple
                 case "Dopple.Frame":
                     return typeof(Frame);
                 default:
-                    throw new Exception();
+                    return typeof(MotionPoint);
             }
         }
     }
@@ -442,6 +443,7 @@ namespace Dopple
         public ARFrmHeader hdr;
         public double diffTime;
         public int idx;
+        public MotionPoint []motionPoints;
 
         [NonSerialized]
         public Recording parentRecording = null;
@@ -486,4 +488,46 @@ namespace Dopple
             return (Frame)bf.Deserialize(ms);
         }
     }
+
+    [Serializable]
+    public struct MotionPoint
+    {
+        public double X, Y, Z;
+        public double rX, rY, rZ;
+        public double qX, qY, qZ, qW;
+        public double gX, gY, gZ;
+        public double timeStamp;
+
+        public MotionPoint(double x, double y, double z,
+            double rx, double ry, double rz,
+            double gx, double gy, double gz,
+            double qx, double qy, double qz, double qw,
+            double t)
+        {
+            X = x;
+            Y = y;
+            Z = z;
+            rX = rx;
+            rY = ry;
+            rZ = rz;
+            qX = qx;
+            qY = qy;
+            qZ = qz;
+            qW = qw;
+            gX = gx;
+            gY = gy;
+            gZ = gz;
+            timeStamp = t;
+        }
+
+        public override string ToString() => $"X = {X}, Y = {Y}, Z = {Z}";
+    }
+
+    public class NrmPt
+    {
+        public Vector3 pt;
+        public Vector3 nrm = Vector3.UnitZ;
+        public Vector2 spt;
+    }
+
 }

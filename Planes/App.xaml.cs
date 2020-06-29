@@ -27,6 +27,10 @@ namespace Planes
                     bytes,
                     new Dopple.Settings() { });
             }
+            else
+            {
+                App.Recording = Dopple.Recording.Live;
+            }
             //PtCloudAligner.Test();
             OpenCV = new OpenCV();
             ptCloudAligner = new PtCloudAligner();
@@ -44,7 +48,7 @@ namespace Planes
         float minDPVal = 0.9f;
         float maxCoverage = 10.0f;
         int blur = 2;
-        int depthLod = 3;
+        int depthLod = 5;
 
         public event EventHandler<EventArgs> OnSettingsChanged;
 

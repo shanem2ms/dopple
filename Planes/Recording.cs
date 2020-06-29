@@ -12,6 +12,7 @@ namespace Dopple
         List<Frame> completeFrames = new List<Frame>();
 
         public event EventHandler<int> OnFrameChanged;
+        public event EventHandler<double> OnDownloadProgress;
 
         public int NumFrames => Frames.Count;
         int curFrameIdx = 0;
@@ -61,6 +62,20 @@ namespace Dopple
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("CurrentFrame"));
         }
 
+        static Recording live = null;
+        static public Recording Live
+        {
+
+            get
+            {
+                if (live == null)
+                {
+                    live = new Recording();
+                }
+                return live;
+            }
+        }
+
         public string Name { get; }
 
         public Frame CurrentFrame => Frames[this.curFrameIdx];
@@ -83,6 +98,37 @@ namespace Dopple
 
         public float MaxDepthVal { get; } = 0;
         public float MinDepthVal { get; } = 0;
+
+        TcpService tcpService = new TcpService();
+
+        public Recording()
+        {
+
+            TcpService tcpService = new TcpService();
+            tcpService.OnDataReceived += TcpService_OnDataReceived;
+            tcpService.OnLiveFrame += TcpService_OnLiveFrame;
+            tcpService.OnNewRecording += TcpService_OnNewRecording;
+            tcpService.Start();
+
+        }
+
+        private void TcpService_OnNewRecording(object sender, OnNewRecordingArgs e)
+        {
+            throw new NotImplementedException();
+        }
+
+        private void TcpService_OnLiveFrame(object sender, OnLiveFrameArgs e)
+        {
+            this.Frames.Add(e.frame);
+            this.curFrameIdx = this.Frames.Count - 1;
+            OnFrameChanged?.Invoke(this, this.Frames.Count - 1);
+        }
+
+        private void TcpService_OnDataReceived(object sender, OnDataReceived e)
+        {
+            this.OnDownloadProgress?.Invoke(this, ((double)e.dataSoFar / (double)e.totalData));
+        }
+
         public Recording(string name, byte[] data, Settings settings)
         {
             long currentReadOffset = 0;
@@ -138,6 +184,7 @@ namespace Dopple
             this.OnFrameProcessed += Recording_OnFrameProcessed;
             recavg /= avgweight;
 
+            this.curFrameIdx = 187;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("NumFrames"));
         }
 

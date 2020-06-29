@@ -38,22 +38,91 @@
 
             </Grid>
         </DataTemplate>
+        <DataTemplate DataType="{x:Type local:PtsRenderer}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="20"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="50" />
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="RX"/>
+                <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Vertical">
+                    <Slider Margin="5" Minimum="-100" Maximum="100"
+                        Value="{Binding Path=OffsetRotationX}"/>
+                    <TextBlock Text="{Binding Path=OffsetRotationX}" />
+                </StackPanel>
+
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="RY"/>
+                <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Vertical">
+                    <Slider Margin="5" Minimum="-100" Maximum="100"
+                        Value="{Binding Path=OffsetRotationY}"/>
+                    <TextBlock Text="{Binding Path=OffsetRotationY}" />
+                </StackPanel>
+
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="RZ"/>
+                <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Vertical">
+                    <Slider Margin="5" Minimum="-100" Maximum="100"
+                        Value="{Binding Path=OffsetRotationZ}"/>
+                    <TextBlock Text="{Binding Path=OffsetRotationZ}" />
+                </StackPanel>
+
+                <TextBlock Grid.Row="3" Grid.Column="0" Text="TX"/>
+                <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Vertical">
+                    <Slider Margin="5" Minimum="-100" Maximum="100"
+                        Value="{Binding Path=OffsetTranslationX}"/>
+                    <TextBlock Text="{Binding Path=OffsetTranslationX}" />
+                </StackPanel>
+
+                <TextBlock Grid.Row="4" Grid.Column="0" Text="TY"/>
+                <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Vertical">
+                    <Slider Margin="5" Minimum="-100" Maximum="100"
+                        Value="{Binding Path=OffsetTranslationY}"/>
+                    <TextBlock Text="{Binding Path=OffsetTranslationY}" />
+                </StackPanel>
+
+                <TextBlock Grid.Row="5" Grid.Column="0" Text="TZ"/>
+                <StackPanel Grid.Row="5" Grid.Column="1" Orientation="Vertical">
+                    <Slider Margin="5" Minimum="-100" Maximum="100"
+                        Value="{Binding Path=OffsetTranslationZ}"/>
+                    <TextBlock Text="{Binding Path=OffsetTranslationZ}" />
+                </StackPanel>
+
+                <TextBlock Grid.Row="7" Grid.Column="1" Text="{Binding Path=TotalDist}" />
+                <Button Grid.Row="8" Grid.Column="1" Content="Align" Click="Button_Click"/>
+                <Button Grid.Row="9" Grid.Column="1" Content="Reset" Click="Button_Click_1"/>
+            </Grid>
+
+        </DataTemplate>
     </Window.Resources>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="5" />
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="100"/>
-            <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="100"/>
+            <ColumnDefinition/>
+            <ColumnDefinition Width="240"/>
         </Grid.ColumnDefinitions>
-        <WindowsFormsHost x:Name="HostControl" Margin="0,0,0,0" Grid.Row="1" Grid.Column="1" >
+        <WindowsFormsHost x:Name="HostControl" Margin="0,0,0.333,19.667" Grid.Row="1" Grid.Column="1" Grid.RowSpan="2" >
             <opentk:GLControl x:Name="glControl" Resize="glControl_Resize" />
         </WindowsFormsHost>
-        <StackPanel DataContext="{Binding Path=Settings}" Orientation="Vertical" Grid.Row="1" Grid.Column="0">
+        <GridSplitter ResizeDirection="Rows" Grid.Row="2" Grid.ColumnSpan="3" VerticalAlignment="Stretch" HorizontalAlignment="Stretch"/>
+        <ProgressBar Grid.Row="3" Grid.Column="1" x:Name="DownloadProgres" Maximum="10000" Minimum="0" Margin="0,0.333,0.333,-0.333"/>
+        <StackPanel DataContext="{Binding Path=Settings}" Orientation="Vertical" Grid.Row="1" Grid.Column="0" Margin="0,0,0,19.667" Grid.RowSpan="2">
             <Label Content="PlaneMinSize" />
             <TextBox Text="{Binding Path=PlaneMinSize, UpdateSourceTrigger=LostFocus}"/>
             <Label Content="PlaneThreshold" />
@@ -67,6 +136,7 @@
             <Label Content="DepthLod" />
             <TextBox Text="{Binding DepthLod, UpdateSourceTrigger=LostFocus}"/>
         </StackPanel>
-        <ContentControl Margin="10" Grid.Row="2" Grid.Column="1" Content="{Binding ActiveRecording}" />
+        <ContentControl Grid.Row="1" Grid.Column="2" Content="{Binding AR}"/>
+        <ContentControl Margin="10,10.333,10.333,9.667" Grid.Row="3" Grid.Column="1" Content="{Binding ActiveRecording}" />
     </Grid>
 </Window>

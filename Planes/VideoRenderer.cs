@@ -118,5 +118,6 @@ namespace Planes
             viewScale = (float)Math.Pow(10.0, lVs);
             viewOffset += new Vector3(0.25f, 0.5f, 0) * (oldScale - viewScale);
         }
+        public override void Action(int param) { }
     }
 }

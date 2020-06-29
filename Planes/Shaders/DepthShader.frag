@@ -24,9 +24,9 @@ void main()
 		dv = (dv - depthRange.x) / (depthRange.y - depthRange.x);
 
 		if (dv < 0.25)
-			rgb = mix(vec3(0,0,0), vec3(0,0,0), dv / 0.25);
+			rgb = mix(vec3(0,0,0), vec3(0,1,0), dv / 0.25);
 		else if (dv < 0.5)
-			rgb = mix(vec3(0,0,0), vec3(0,0,0), (dv - 0.25) / 0.25);
+			rgb = mix(vec3(0,1,0), vec3(1,0,0), (dv - 0.25) / 0.25);
 		else if (dv < 0.75)
 			rgb = mix(vec3(1,0,0), vec3(1,0,1), (dv - 0.5) / 0.25);
 		else

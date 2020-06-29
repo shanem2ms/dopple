@@ -3,5 +3,5 @@ uniform vec4 pickColor;
 in vec3 vWsPos;
 void main()
 {
-	gl_FragColor = vec4(gl_FragCoord.z);
+	gl_FragColor = vec4(vWsPos, 1);
 }

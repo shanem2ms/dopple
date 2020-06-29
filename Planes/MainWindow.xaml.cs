@@ -23,23 +23,24 @@ namespace Planes
         public abstract void MouseDn(int x, int y, wf.MouseButtons button);
         public abstract void MouseMove(int x, int y, wf.MouseButtons button);
         public abstract void MouseWheel(int x, int y, int delta);
+        public abstract void Action(int param);
     }
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
     public partial class MainWindow : Window
     {
-
         public Dopple.Recording ActiveRecording => App.Recording;
-        IRenderer[] renderers = new IRenderer[3] {
+        IRenderer[] renderers = new IRenderer[] {
                 new VideoRenderer(),
                 new DepthRenderer(),
-                new PtsRenderer() };
+                new PtsRenderer(), 
+                new MotionRenderer() };
         System.Timers.Timer renderTimer = new System.Timers.Timer();
 
         public Settings Settings => App.Settings;
 
-        IRenderer ar;
+        public IRenderer AR => renderers[2];
 
         public MainWindow()
         {
@@ -47,7 +48,6 @@ namespace Planes
             InitializeComponent();
             foreach (var r in renderers)
                 r.Invalidate = OnInvalidate;
-            ar = renderers[2];
         }
 
         void OnInvalidate()
@@ -81,23 +81,33 @@ namespace Planes
                 r.Load();
 
             renderTimer.Start();
+
+            ActiveRecording.OnDownloadProgress += ActiveRecording_OnDownloadProgress;
+        }
+
+        private void ActiveRecording_OnDownloadProgress(object sender, double e)
+        {
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                this.DownloadProgres.Value = e * 10000.0;
+            }));
         }
 
         private void GlControl_Paint(object sender, wf.PaintEventArgs e)
-        {            
-            ar.Paint();
+        {
+            AR.Paint();
             glControl.SwapBuffers();
         }
 
 
         private void GlControl_MouseUp(object sender, wf.MouseEventArgs e)
         {
-            ar.MouseUp(e.X, e.Y);
+            AR.MouseUp(e.X, e.Y);
         }
 
         private void GlControl_MouseWheel(object sender, wf.MouseEventArgs e)
         {
-            ar.MouseWheel(e.X, e.Y, e.Delta);
+            AR.MouseWheel(e.X, e.Y, e.Delta);
         }
 
         Vector2 ScreenToViewport(System.Drawing.Point pt)
@@ -108,12 +118,12 @@ namespace Planes
 
         private void GlControl_MouseMove(object sender, wf.MouseEventArgs e)
         {
-            ar.MouseMove(e.X, e.Y, e.Button);
+            AR.MouseMove(e.X, e.Y, e.Button);
         }
 
         private void GlControl_MouseDown(object sender, wf.MouseEventArgs e)
         {
-            ar.MouseDn(e.X, e.Y, e.Button);
+            AR.MouseDn(e.X, e.Y, e.Button);
         }
 
         private void Back_Clicked(object sender, RoutedEventArgs e)
@@ -125,5 +135,14 @@ namespace Planes
             App.Recording.CurrentFrameIdx++;
         }
 
+        private void Button_Click(object sender, RoutedEventArgs e)
+        {
+            AR.Action(0);
+        }
+
+        private void Button_Click_1(object sender, RoutedEventArgs e)
+        {
+            AR.Action(1);
+        }
     }
 }

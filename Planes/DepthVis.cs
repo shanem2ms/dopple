@@ -70,21 +70,23 @@ namespace Planes
 
         public void Render(Matrix4 viewProj)
         {
-            if (hasNewFrame)
+            if (hasNewFrame && App.Recording.Frames.Count > 0)
             {
                 int curFrame = App.Recording.CurrentFrameIdx + this.frameOffset;
                 if (curFrame >= App.Recording.Frames.Count)
                     curFrame = App.Recording.Frames.Count - 1;
                 Dopple.VideoFrame vf = App.Recording.Frames[curFrame].vf;
                 float[] depthIn = vf.GetDepthVals();
-                float avgVal;
                 float[] depthVals =
-                    VideoFrame.GetDepthInv(depthIn, vf.DepthWidth, vf.DepthHeight, out avgVal);
+                    VideoFrame.GetDepthInv(depthIn, vf.DepthWidth, vf.DepthHeight, out _);
+
                 _DepthTexture.LoadDepthFrame(vf.DepthWidth, vf.DepthHeight, depthVals);
 
+                float max = depthVals.Max();
+                float min = depthVals.Min();
                 //var dvValid = depthVals.Where(f => !float.IsNaN(f) && !float.IsInfinity(f));
-                float minval = 1 / 8.0f, maxval = 1.0f;// dvValid.Min(), maxval = dvValid.Max();
-                this.depthRange = new Vector2(0, avgVal);
+
+                this.depthRange = new Vector2(min, max);
                 hasNewFrame = false;
             }
 

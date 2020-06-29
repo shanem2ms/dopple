@@ -22,6 +22,7 @@ namespace Planes
 
         VideoVis[] videoVis = new VideoVis[2];
         DepthVis[] depthVis = new DepthVis[2];
+        DeviceMotionVis dmv = null;
         RenderTarget[] quads = new RenderTarget[2];
         Matrix4 rotMatrix = Matrix4.Identity;
 
@@ -48,6 +49,7 @@ namespace Planes
                 videoVis[i] = new VideoVis(i); 
                 depthVis[i] = new DepthVis(i);
             }
+            dmv = new DeviceMotionVis();
             renderTimer.Start();
         }
 
@@ -78,8 +80,9 @@ namespace Planes
             videoVis[0].Render(viewProj);
             depthVis[0].Render(viewProj);
             quads[1].Use();
-            videoVis[1].Render(viewProj);
-            depthVis[1].Render(viewProj);
+            //videoVis[1].Render(viewProj);
+            //depthVis[1].Render(viewProj);
+            dmv.Render(viewProj);
             FrameBuffer.BindNone();
             GL.Disable(EnableCap.Blend);
             GL.Disable(EnableCap.DepthTest);
@@ -128,5 +131,7 @@ namespace Planes
             viewScale = (float)Math.Pow(10.0, lVs);
             viewOffset += new Vector3(0.25f, 0.5f, 0) * (oldScale - viewScale);
         }
+
+        public override void Action(int param) { }
     }
 }

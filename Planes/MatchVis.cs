@@ -5,11 +5,14 @@ using GLObjects;
 using System.Collections.Generic;
 using System.Linq;
 using System.Drawing.Drawing2D;
+using Dopple;
 
 namespace Planes
 {
     class MatchVis
     {
+        Aligner aligner = new Aligner();
+
         /// The program used for drawing the triangle.
         /// </summary>
         private Program _Program;
@@ -50,72 +53,44 @@ namespace Planes
             return new Vector3(1, 1, 1);
         }
 
-        public void LoadVideoFrame()
+        public void UpdateFrame(VideoFrame vf0, NrmPt[][] ptArrays, int[] matches)
         {
-            int curFrame = App.Recording.CurrentFrameIdx;
-
-            int nextFrame = App.Recording.CurrentFrameIdx + (1 * App.FrameDelta);
-            if (nextFrame >= App.Recording.Frames.Count)
-                nextFrame = App.Recording.Frames.Count - 1;
-            Dopple.Frame f0 = App.Recording.Frames[curFrame];
-            Dopple.Frame f1 = App.Recording.Frames[nextFrame];
-
-            Tuple<int, int>[] matches = App.ptCloudAligner.Matches;
-
-            Dopple.VideoFrame vf0 = f0.vf;
-            float invWidth = 1.0f / f0.vf.ImageWidth * f0.vf.DepthWidth;
-            float invHeight = 1.0f / f0.vf.ImageHeight * f0.vf.DepthHeight;
-
-            float dw = 1.0f / f0.vf.DepthWidth;
-            float dh = 1.0f / f0.vf.DepthHeight;
-
-            List<Vector3> mpts = new List<Vector3>();
-            List<uint> mindices = new List<uint>();
-            var pts0 = f0.vf.CalcDepthPoints();
-            var pts1 = f1.vf.CalcDepthPoints();
             List<Vector3> qpts = new List<Vector3>();
             List<Vector3> colors = new List<Vector3>();
             List<uint> ind = new List<uint>();
-            float vwidth = f0.vf.ImageWidth - 1;
-            float vheight = f0.vf.ImageHeight - 1;
-            Matrix4 projMat = f0.vf.ProjectionMat;
-            Matrix4 projInv = projMat.Inverted();
-            float pixel = 1.0f / f0.vf.DepthWidth;
-            foreach (var m in matches)
-            {
-                var p0 = pts0[m.Item1];
-                Vector3 rgbcol0;
-                Vector3 c0 = f0.vf.GetRGBVal((int)(p0.spt.X * vwidth), (int)(p0.spt.Y * vheight));
-                rgbcol0 = c0;
 
-                var p1 = pts1[m.Item2];
-                Vector3 rgbcol1;
-                Vector3 c1 = f1.vf.GetRGBVal((int)(p1.spt.X * vwidth), (int)(p1.spt.Y * vheight));
-                rgbcol1 = c1;
+            for (int idx = 0; idx < matches.Length; idx += 2)
+            {
+                var p0n = ptArrays[0][matches[idx]];
+                var p1n = ptArrays[1][matches[idx + 1]];
+                var p0 = p0n.pt;
+                var p1 = p1n.pt;
+
+                Matrix4 projMat = vf0.CameraMatrix;
+                Matrix4 projInv = projMat.Inverted();
 
                 Vector3 spt =
-                    Vector3.TransformPerspective(p0.pt, projMat);
-                spt.X += pixel;
-                Vector3 ptn = Vector3.TransformPerspective(spt, projInv);
-                float d = (ptn - p0.pt).Length;
-                float dist = d * 0.001f;
+                    Vector3.TransformPerspective(p0, projMat);
+                float pixelX = 1.0f / vf0.DepthWidth;
+                float pixelY = 1.0f / vf0.DepthHeight;
+                pixelX *= 0.25f;
 
-                Vector3 zdir = (p1.pt - p0.pt).Normalized();
+                Vector3 ptn = Vector3.TransformPerspective(spt, projInv);
+                Vector3 zdir = (p1 - p0).Normalized();
                 Vector3 xdir = Vector3.Cross(zdir, Vector3.UnitY).Normalized();
                 Vector3 ydir = Vector3.Cross(xdir, zdir);
 
                 uint cIdx = (uint)qpts.Count;
-                qpts.Add(p0.pt - xdir * dist);
-                qpts.Add(p0.pt + xdir * dist);
-                qpts.Add(p1.pt - xdir * dist);
-                qpts.Add(p1.pt + xdir * dist);
+                qpts.Add(p0 - xdir * pixelX);
+                qpts.Add(p0 + xdir * pixelX);
+                qpts.Add(p1 - xdir * pixelX);
+                qpts.Add(p1 + xdir * pixelX);
 
                 Vector3 rgbcol = new Vector3(1, 1, 0);
                 colors.Add(rgbcol);
                 colors.Add(rgbcol);
                 colors.Add(rgbcol);
                 colors.Add(rgbcol);
-
 
                 ind.Add(cIdx);
                 ind.Add(cIdx + 1);
@@ -135,11 +110,6 @@ namespace Planes
 
         public void Render(Matrix4 viewProjMat, bool doPick)
         {
-            if (isDirty)
-            {
-                LoadVideoFrame();
-                isDirty = false;
-            }
             if (genVertexArray == null)
                 return;
 
@@ -147,7 +117,7 @@ namespace Planes
             _Program.SetMat4("uMVP", ref viewProjMat);
             _Program.Set1("opacity", 1.0f);
             _Program.Set3("meshColor", new Vector3(1, 1, 1));
-            _Program.Set1("ambient", 1);
+            _Program.Set1("ambient", 1.0f);
             _Program.Set3("lightPos", new Vector3(2, 5, 2));
             _Program.Set1("opacity", 1.0f);
             Matrix4 matWorldInvT = Matrix4.Identity;
@@ -155,7 +125,6 @@ namespace Planes
             _Program.SetMat4("uWorldInvTranspose", ref matWorldInvT);
             _Program.SetMat4("uCamMat", ref videoMatrix);
             genVertexArray.Draw();
-
         }
         private static readonly Vector3[] _Quad = new Vector3[] {
             new Vector3(1.0f, 0.0f, 0.0f),  // 0 
