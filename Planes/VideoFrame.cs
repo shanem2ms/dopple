@@ -162,22 +162,22 @@ namespace Dopple
 
             float []depthVals = GetDepthVals();
             Matrix4 cm = CameraMatrix;
+            float lastGoodDepth = -1;
             for (int y = 0; y < depthHeight; ++y)
             {
                 for (int x = 0; x < depthWidth; ++x)
                 {
                     float depthVal = depthVals[y * depthWidth + x];
                     if (!float.IsNaN(depthVal))
-                    {
-                        float z = 1 / depthVal;
-                        Vector4 modelPos = Vector4.Transform(cm, new Vector4(x, y, z, 1));
-                        modelPos /= modelPos.W;
-                        pos.Add(y * depthWidth + x, new V3Pt(new Vector3(modelPos.X, modelPos.Y, modelPos.Z),
-                            new Vector2((float)x / (float)(depthWidth - 1), (float)y / (float)(depthHeight - 1))));
-                    }
+                        lastGoodDepth = depthVal;
                     else
-                    {
-                    }
+                        depthVal = lastGoodDepth;
+
+                    float z = 1 / depthVal;
+                    Vector4 modelPos = Vector4.Transform(cm, new Vector4(x, y, z, 1));
+                    modelPos /= modelPos.W;
+                    pos.Add(y * depthWidth + x, new V3Pt(new Vector3(modelPos.X, modelPos.Y, modelPos.Z),
+                        new Vector2((float)x / (float)(depthWidth - 1), (float)y / (float)(depthHeight - 1))));
                 }
             }
             return pos;

@@ -64,7 +64,11 @@ namespace Planes
                 var p0n = ptArrays[0][matches[idx]];
                 var p1n = ptArrays[1][matches[idx + 1]];
                 var p0 = p0n.pt;
-                var p1 = p1n.pt;
+
+                Vector3 nrmDist = Vector3.Dot((p1n.pt - p0n.pt), p0n.nrm.Normalized()) * p0n.nrm;
+                var p1 = p0n.pt + nrmDist;
+
+                //var p1 = p1n.pt;
 
                 Matrix4 projMat = vf0.CameraMatrix;
                 Matrix4 projInv = projMat.Inverted();

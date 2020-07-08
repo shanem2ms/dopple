@@ -196,7 +196,6 @@ namespace Dopple
                 for (int i = 0; i < NumFrames; ++i)
                 {
                     Frames[i].BuildData(settings, null, null);
-                    float score = 0;
                     OnFrameProcessed(this, new OnFrameProcessedArgs(i, i + 1, NumFrames, 0));
                 }
             });

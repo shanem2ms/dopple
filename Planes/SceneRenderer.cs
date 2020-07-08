@@ -8,11 +8,14 @@ using System.Windows.Forms;
 using System.Linq;
 using Dopple;
 using System.ComponentModel;
-using System.Drawing.Drawing2D;
+using System.Collections.Generic;
+using System.Threading;
+using System.Windows.Documents;
+using OpenCvSharp;
 
 namespace Planes
 {
-    class PtsRenderer : IRenderer, INotifyPropertyChanged
+    class SceneRenderer : IRenderer, INotifyPropertyChanged
     {
         public Dopple.Recording ActiveRecording => App.Recording;
         public Settings Settings => App.Settings;
@@ -28,8 +31,7 @@ namespace Planes
 
         VideoVis[] videoVis = new VideoVis[2];
         RenderTarget[] quads = new RenderTarget[2];
-        DepthPtsVis[] depthVis = new DepthPtsVis[2];
-        MatchVis matchVis;
+        SceneVis sceneVis;
         Selection selVis;
         RenderTarget pickTarget;
 
@@ -40,8 +42,6 @@ namespace Planes
         Matrix4 rotMatrixDn;
         Vector3 curPosDn;
         Vector3 wOffset;
-
-        Matrix4 alignMat = Matrix4.Identity;
 
         int currentWidth;
         int currentHeight;
@@ -118,20 +118,14 @@ namespace Planes
 
 
 
-        public PtsRenderer()
+        public SceneRenderer()
         {
             App.Recording.OnFrameChanged += Recording_OnFrameChanged;
-            App.Settings.OnSettingsChanged += Settings_OnSettingsChanged;
 
             Vector3 v = new Vector3(10, 11, 12);
             Quaternion q = Quaternion.FromAxisAngle(new Vector3(1, 2, 3).Normalized(), 1.0f);
             Vector3 vp = q * v;
             Vector3 vp2 = rotate_vector_by_quaternion(v, q);
-        }
-
-        private void Settings_OnSettingsChanged(object sender, EventArgs e)
-        {
-            isDirty = true;
         }
 
         private void Recording_OnFrameChanged(object sender, int e)
@@ -152,12 +146,12 @@ namespace Planes
 
         public override void Load()
         {
+            sceneVis = new SceneVis();
             for (int i = 0; i < 2; ++i)
             {
                 videoVis[i] = new VideoVis(i);
-                depthVis[i] = new DepthPtsVis(i, true);
+                
             }
-            matchVis = new MatchVis();
             selVis = new Selection();
         }
 
@@ -191,8 +185,6 @@ namespace Planes
                 int dw = vf.DepthWidth;
                 int dh = vf.DepthHeight;
 
-                Matrix4 mat = idx == 0 ? Matrix4.Identity : this.alignMat;
-
                 float invWidth = 1.0f / vf.ImageWidth * dw;
                 float invHeight = 1.0f / vf.ImageHeight * dh;
 
@@ -201,7 +193,7 @@ namespace Planes
                 ptArrays[idx] = ptArray;
                 foreach (var p in pts)
                 {
-                    ptArray[p.Key] = new NrmPt() { pt = Vector3.TransformPosition(p.Value.pt, mat), spt = p.Value.spt };
+                    ptArray[p.Key] = new NrmPt() { pt = p.Value.pt, spt = p.Value.spt };
                 }
 
                 for (int y = 0; y < (dh - 1); ++y)
@@ -220,7 +212,7 @@ namespace Planes
                             continue;
                         NrmPt[] vpts = validPts.ToArray();
                         ptArray[(y) * dw + (x)].nrm = Vector3.Cross((vpts[0].pt - vpts[1].pt).Normalized(),
-                                                (vpts[2].pt - vpts[0].pt).Normalized()).Normalized();
+                                                (vpts[2].pt - vpts[0].pt).Normalized());
                     }
                 }
 
@@ -229,52 +221,66 @@ namespace Planes
             return ptArrays;
         }
 
+        List<NrmPt[]> framePts = null;
+        bool framesReady = false;
         void UpdateFrame()
         {
-            int curFrame = App.Recording.CurrentFrameIdx;
-            if (curFrame >= App.Recording.Frames.Count - 1)
-                curFrame = App.Recording.Frames.Count - 2;
-
-            Matrix4 mat = Matrix4.CreateTranslation(offsetTranslation) *
-                Matrix4.CreateFromQuaternion(
-                    Quaternion.FromEulerAngles(new Vector3(offsetRotation.X, -offsetRotation.Y, offsetRotation.Z)));
-
-            NrmPt[][] ptArrays = GetNrmPts(curFrame);
-            for (int idx = 0; idx < 2; ++idx)
+            if (framePts == null)
             {
-                VideoFrame vf = App.Recording.Frames[curFrame + idx].vf;
-                var arr = ptArrays[idx];
-                if (idx == 1)
+                framePts = new List<NrmPt[]>();
+                Thread t = new Thread(() =>
                 {
-                    arr = ptArrays[idx].Select(n => new NrmPt()
+                    int startFrame = 0;
+                    int endFrame = App.Recording.NumFrames - 1;
+                    Matrix4 totalMatrix = Matrix4.Identity;
+
+                    int dw = App.Recording.Frames[0].vf.DepthWidth;
+                    int dh = App.Recording.Frames[0].vf.depthHeight;
+                    for (int curFrame = startFrame; curFrame < endFrame; ++curFrame)
                     {
-                        pt = Vector3.TransformPosition(n.pt, mat),
-                        nrm = n.nrm,
-                        spt = n.spt
-                    }).ToArray();
-                }
-                depthVis[idx].UpdateFrame(vf, arr, idx == 0 ? Vector3.UnitX : Vector3.UnitZ);
-                
+                        NrmPt[][] ptArrays = GetNrmPts(curFrame);
+                        Vector3[] parr0 = ptArrays[0].Select(p => p.pt).ToArray();
+                        Vector3[] nrm0 = ptArrays[0].Select(p => p.nrm).ToArray();
+                        Vector3[] parr1 = ptArrays[1].Select(p => p.pt).ToArray();
+                        Vector3 outOffset, outERot;
+                        Aligner.Align(parr0, nrm0, parr1, dw, dh, out outOffset, out outERot);
+                        Matrix4 mat = Matrix4.CreateTranslation(outOffset) *
+                            Matrix4.CreateFromQuaternion(
+                                Quaternion.FromEulerAngles(new Vector3(outERot.X, -outERot.Y, outERot.Z)));
+                        totalMatrix = mat * totalMatrix;
+
+                        if (curFrame == startFrame)
+                        {
+                            var arr = ptArrays[0].Select(n => new NrmPt()
+                            {
+                                pt = n.pt,
+                                nrm = n.nrm,
+                                spt = n.spt
+                            }).ToArray();
+                            framePts.Add(arr);
+                        }
+                        {
+                            var arr = ptArrays[1].Select(n => new NrmPt()
+                            {
+                                pt = Vector3.TransformPosition(n.pt, totalMatrix),
+                                nrm = n.nrm,
+                                spt = n.spt
+                            }).ToArray();
+                            framePts.Add(arr);
+                        }
                     }
-            Vector3[] parr0 = ptArrays[0].Select(p => p.pt).ToArray();
-            Vector3[] parr1 = ptArrays[1].Select(p => p.pt).ToArray();
-            Vector3[] pnrm1 = ptArrays[0].Select(p => p.nrm).ToArray();
-            matches = Aligner.FindMatches(parr0, parr1);
 
-            for (int idx = 0; idx < parr1.Length; ++idx)
-            {
-                parr1[idx] = Vector3.TransformPosition(parr1[idx], mat);
+                    framesReady = true;
+                });
+                t.Start();
             }
-            RecalcTotalDist(parr0, pnrm1, parr1, matches);
 
-            ptArrays[1] = ptArrays[1].Select(n => new NrmPt()
+            if (framesReady)
             {
-                pt = Vector3.TransformPosition(n.pt, mat),
-                nrm = n.nrm,
-                spt = n.spt
-            }).ToArray();
-
-            matchVis.UpdateFrame(App.Recording.CurrentFrame.vf, ptArrays, matches);
+                this.sceneVis.UpdateFrame(App.Recording.CurrentFrame.vf, 
+                    framePts.GetRange(0, App.Recording.CurrentFrameIdx));
+                isDirty = false;
+            }
         }
 
         void RecalcTotalDist(Vector3[] parr0, Vector3[] pnrm0, Vector3[] parr1, int[] matches)
@@ -284,7 +290,7 @@ namespace Planes
             {
                 float dp = Vector3.Dot((parr0[matches[idx]] - parr1[matches[idx + 1]]), pnrm0[matches[idx]]);
                 totalDist += dp * dp;
-                    
+
             }
 
             TotalDist = totalDist;
@@ -292,27 +298,12 @@ namespace Planes
         }
 
 
-        void Align(out Vector3 outOffset, out Vector3 outERot)
-        {
-            int curFrame = App.Recording.CurrentFrameIdx;
-            if (curFrame >= App.Recording.Frames.Count - 1)
-                curFrame = App.Recording.Frames.Count - 2;
-            NrmPt[][] ptArrays = GetNrmPts(curFrame);
-            Vector3[] parr0 = ptArrays[0].Select(p => p.pt).ToArray();
-            Vector3[] nrm0 = ptArrays[0].Select(p => p.nrm).ToArray();
-            Vector3[] parr1 = ptArrays[1].Select(p => p.pt).ToArray();
-            var vf = App.Recording.CurrentFrame.vf;
-            Aligner.Align(parr0, nrm0, parr1, vf.DepthWidth, vf.DepthHeight, out outOffset, out outERot);
-        }
-
         public override void Paint()
         {
             if (isDirty)
             {
                 UpdateFrame();
-                isDirty = false;
             }
-
             FrameBuffer.BindNone();
             GL.Disable(EnableCap.Blend);
             GL.Disable(EnableCap.DepthTest);
@@ -327,15 +318,7 @@ namespace Planes
                 GL.Enable(EnableCap.Blend);
                 GL.Enable(EnableCap.DepthTest);
                 if (i == 0)
-                    depthVis[0].Render(viewProj, false, false);
-                else
-                {
-                    matchVis.Render(viewProj, false);
-                    GL.DepthMask(false);
-                    depthVis[0].Render(viewProj, true, false);
-                    depthVis[1].Render(viewProj, true, false);
-                    GL.DepthMask(true);
-                }
+                    sceneVis.Render(viewProj, false, false);
                 this.selVis.Draw(viewProj);
             }
             FrameBuffer.BindNone();
@@ -544,7 +527,7 @@ namespace Planes
             {
                 GL.Enable(EnableCap.Blend);
                 GL.Enable(EnableCap.DepthTest);
-                depthVis[i].Render(viewProj, false, true);
+                sceneVis.Render(viewProj, false, true);
             }
             GL.Finish();
             if (pixels == null || pixels.Length != (pickTarget.Width * pickTarget.Height))
@@ -582,36 +565,6 @@ namespace Planes
 
         public override void Action(int param)
         {
-            if (param == 0)
-            {
-                Vector3 offset;
-                Vector3 eRot;
-                Align(out offset, out eRot);
-                offsetTranslation = offset;
-                offsetRotation = eRot;
-            }
-            else if (param == 1)
-            {
-                offsetTranslation = Vector3.Zero;
-                offsetRotation = Vector3.Zero;
-                this.alignMat = Matrix4.Identity;
-            }
-            else if (param == 2)
-            {
-                Matrix4 amat = Matrix4.CreateTranslation(offsetTranslation) *
-                    Matrix4.CreateFromQuaternion(
-                    Quaternion.FromEulerAngles(new Vector3(offsetRotation.X, -offsetRotation.Y, offsetRotation.Z)));
-                this.alignMat *= amat;
-                offsetTranslation = Vector3.Zero;
-                offsetRotation = Vector3.Zero;
-            }
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("OffsetTranslationX"));
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("OffsetTranslationY"));
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("OffsetTranslationZ"));
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("OffsetRotationX"));
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("OffsetRotationY"));
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("OffsetRotationZ"));
-            isDirty = true;
         }
     }
 }

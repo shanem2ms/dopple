@@ -35,7 +35,8 @@ namespace Planes
                 new VideoRenderer(),
                 new DepthRenderer(),
                 new PtsRenderer(), 
-                new MotionRenderer() };
+                new MotionRenderer(),
+                new SceneRenderer()};
         System.Timers.Timer renderTimer = new System.Timers.Timer();
 
         public Settings Settings => App.Settings;
@@ -66,6 +67,11 @@ namespace Planes
             glControl.Invalidate();
         }
 
+        public void GlDebugProc(DebugSource source, DebugType type, int id, DebugSeverity severity, int length, IntPtr message, IntPtr userParam)
+        {
+            
+        }
+
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
             glControl.Paint += GlControl_Paint;
@@ -76,6 +82,7 @@ namespace Planes
             renderTimer.Interval = 1.0f / 60.0f;
             renderTimer.Elapsed += RenderTimer_Elapsed;
 
+            GL.DebugMessageCallback(GlDebugProc, IntPtr.Zero);
             Registry.LoadAllPrograms();
             foreach (var r in renderers)
                 r.Load();
@@ -143,6 +150,11 @@ namespace Planes
         private void Button_Click_1(object sender, RoutedEventArgs e)
         {
             AR.Action(1);
+        }
+
+        private void Button_Click_2(object sender, RoutedEventArgs e)
+        {
+            AR.Action(2);
         }
     }
 }

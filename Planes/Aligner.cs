@@ -22,7 +22,7 @@ namespace Planes
         public static extern void FreePtCloudAlign(IntPtr aligner);
 
         [DllImport("ptslib.dll")]
-        public static extern void BestFit(IntPtr pts0, uint ptCount0, IntPtr pts1, uint ptCount1, IntPtr outTranslate,
+        public static extern void BestFit(IntPtr pts0, uint ptCount0, IntPtr pts1, uint ptCount1, int dw, int dh, IntPtr outTranslate,
             IntPtr outRotate);
 
         [DllImport("ptslib.dll")]
@@ -85,15 +85,18 @@ namespace Planes
             return matchArray;
         }
 
-        public static void Align(Vector3[] pts0, Vector3[] pts1, out Vector3 offset,
+        public static void Align(Vector3[] pts0, Vector3[] nrm0, Vector3[] pts1,
+            int dw, int dh,
+            out Vector3 offset,
             out Vector3 eRot)
         {
             IntPtr mpts0 = DPEngine.AllocVec3Array(pts0);
             IntPtr mpts1 = DPEngine.AllocVec3Array(pts1);
 
+
             IntPtr translatePtr = Marshal.AllocHGlobal(sizeof(float) * 3);
             IntPtr rotatePtr = Marshal.AllocHGlobal(sizeof(float) * 3);
-            DPEngine.BestFit(mpts0, (uint)pts0.Length, mpts1, (uint)pts1.Length,  translatePtr, rotatePtr);
+            DPEngine.BestFit(mpts0, (uint)pts0.Length, mpts1, (uint)pts1.Length, dw, dh, translatePtr, rotatePtr);
             Marshal.FreeHGlobal(mpts0);
             Marshal.FreeHGlobal(mpts1);
             offset = (Vector3)Marshal.PtrToStructure(translatePtr, typeof(Vector3));

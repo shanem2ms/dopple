@@ -119,7 +119,9 @@ namespace Planes
 
                 DPEngine.CopyVec3Array(v0, v1Ptr);
                 DPEngine.CopyVec3Array(v1, v2Ptr);
-                DPEngine.BestFit(v1Ptr, (uint)v0.Length, v2Ptr, (uint)v1.Length, translatePtr,
+                DPEngine.BestFit(v1Ptr, (uint)v0.Length, v2Ptr, (uint)v1.Length, 
+                    0, 0,
+                    translatePtr,
                     rotatePtr);
                 Vector3 translate = (Vector3)Marshal.PtrToStructure(translatePtr, typeof(Vector3));
                 Vector4 rotate = (Vector4)Marshal.PtrToStructure(rotatePtr, typeof(Vector4));

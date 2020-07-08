@@ -55,6 +55,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 <TextBlock Grid.Row="0" Grid.Column="0" Text="RX"/>
                 <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Vertical">
@@ -100,7 +101,8 @@
 
                 <TextBlock Grid.Row="7" Grid.Column="1" Text="{Binding Path=TotalDist}" />
                 <Button Grid.Row="8" Grid.Column="1" Content="Align" Click="Button_Click"/>
-                <Button Grid.Row="9" Grid.Column="1" Content="Reset" Click="Button_Click_1"/>
+                <Button Grid.Row="9" Grid.Column="1" Content="Apply" Click="Button_Click_2"/>
+                <Button Grid.Row="10" Grid.Column="1" Content="Reset" Click="Button_Click_1"/>
             </Grid>
 
         </DataTemplate>

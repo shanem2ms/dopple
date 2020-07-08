@@ -5,6 +5,8 @@
 #include <gmtl/Vec.h>
 #include <gmtl/Matrix.h>
 #include <vector>
+#include <string>
+#include <sstream>
 
 using namespace gmtl;
 
@@ -723,24 +725,88 @@ extern "C" {
         return Vec3f(v[0] * cosB - v[2] * sinB, v[1], v[0] * sinB + v[2] * cosB);
     }
 
+    static Vec3f RotZ(float c, Vec3f v)
+    {
+        float cosC = (float)cos(c);
+        float sinC = (float)sin(c);
+        return Vec3f(v[0] * cosC - v[1] * sinC, v[0] * sinC + v[1] * cosC, v[2]);
+    }
+
+    bool IsValid(const Point3v& pt)
+    {
+        return !isnan(pt[0]) && !isinf(pt[0]);
+    }
+
+    void CalcNormals(Point3v* pts0, Vec3v* nrm, int dw, int dh)
+    {
+        for (int y = 0; y < (dh - 1); ++y)
+        {
+            for (int x = 0; x < (dw - 1); ++x)
+            {
+                if (!IsValid(pts0[(y)*dw + (x)]))
+                    continue;
+                Point3v *borders[4] = { &pts0[(y + 1) * dw + (x + 1)],
+                    &pts0[(y + 1) * dw + (x)],
+                    &pts0[(y)*dw + (x + 1)],
+                    &pts0[(y)*dw + (x)] };
+
+                Point3v* vpts[3];
+                int vidx = 0;
+                for (int idx = 0; idx < 4; ++idx)
+                {
+                    if (IsValid(*borders[idx]))
+                        vpts[vidx++] = borders[idx];
+                    if (vidx >= 3)
+                        break;
+                }
+                
+                Vec3f& n = nrm[(y)*dw + (x)];
+                if (vidx < 3)
+                {
+                    continue;
+                }
+                Vec3f i = *vpts[0] - *vpts[1];
+                Vec3f j = *vpts[2] - *vpts[1];
+                normalize(i);
+                normalize(j);
+                cross(n, i, j);
+                normalize(n);
+            }
+            nrm[(y)*dw + (dw - 1)] = Vec3f(0, 0, 1);
+        }
+        for (int x = 0; x < dw; ++x)
+        {
+            nrm[(dh - 1)*dw + x] = Vec3f(0, 0, 1);
+        }
+
+    }
+
 
     __declspec (dllexport) void BestFit(vfloat* _pts0, size_t ptCount0, vfloat* _pts1, size_t ptCount1,
+        int dw, int dh,
         Vec3f* outTranslate,
         Vec3f* outRotate)
     {
         Point3v* pts0 = (Point3v*)_pts0;
         Point3v* pts1 = (Point3v*)_pts1;
 
+        std::vector<Vec3v> normals;
+        normals.resize(ptCount0);
+        CalcNormals(pts0, normals.data(), dw, dh);
+        Point3v* nrm0 = (Point3v*)normals.data();
+
         std::vector<int> matches;
         matches.resize(ptCount0 + ptCount1);
         int nmatches = Matches(pts0, ptCount0, pts1, ptCount1, matches.data());
 
         std::vector<Point3v> pvec0;
+        std::vector<Point3v> pnrm0;
         std::vector<Point3v> pvec1;
 
         for (int idx = 0; idx < nmatches; idx++)
         {
             pvec0.push_back(pts0[matches[idx * 2]]);
+            pnrm0.push_back(nrm0[matches[idx * 2]]);
             pvec1.push_back(pts1[matches[idx * 2 + 1]]);
         }
        
@@ -748,31 +814,42 @@ extern "C" {
             float totalDist2 = 0;
             for (size_t idx = 0; idx < pvec0.size(); ++idx)
             {
-                Vec3f v = (pvec1[idx] - pvec0[idx]);
-                totalDist2 += lengthSquared(v);
+                float dp = dot((pvec1[idx] - pvec0[idx]), pnrm0[idx]);
+                totalDist2 += dp * dp;
             }
-
-            char tmp[1024];
-            sprintf_s(tmp, "O=%f\n", totalDist2);
-            OutputDebugStringA(tmp);
+            
+            //char tmp[1024];
+            //sprintf_s(tmp, "O=%f\n", totalDist2);
+            //OutputDebugStringA(tmp);
         }
        
         Vec3f bestOffset;
         {
             Vec3f t(0, 0, 0);
 
-            for (int tIdx = 0; tIdx < 10; ++tIdx)
+            for (int tIdx = 0; tIdx < 100; ++tIdx)
             {
                 Vec3f dt(0, 0, 0);
+                float tx = t[0];
+                float ty = t[1];
+                float tz = t[2];
                 for (size_t idx = 0; idx < pvec0.size(); ++idx)
                 {
-                    Vec3f d(0, 0, 0);
-                    for (int pIdx = 0; pIdx < 3; ++pIdx)
-                    {
-                        d[pIdx] = -2 * (-t[pIdx] + pvec1[idx][pIdx] - pvec0[idx][pIdx]);
-                    }
+                    
+                    float px = pvec0[idx][0];
+                    float py = pvec0[idx][1];
+                    float pz = pvec0[idx][2];
+                    float qx = pvec1[idx][0];
+                    float qy = pvec1[idx][1];
+                    float qz = pvec1[idx][2];
+                    float nx = pnrm0[idx][0];
+                    float ny = pnrm0[idx][1];
+                    float nz = pnrm0[idx][2];
 
-                    dt += d;
+                    float dtx = -2 * nx * (nx * (px - qx - tx) + ny * (py - qy - ty) + nz * (pz - qz - tz));
+                    float dty = -2 * ny * (nx * (px - qx - tx) + ny * (py - qy - ty) + nz * (pz - qz - tz));
+                    float dtz = -2 * nz * (nx * (px - qx - tx) + ny * (py - qy - ty) + nz * (pz - qz - tz));
+                    dt += Vec3f(dtx, dty, dtz);
                 }
 
                 dt /= (float)pvec0.size();
@@ -781,87 +858,74 @@ extern "C" {
 
             bestOffset = t;
         }
-        
-        for (size_t idx = 0; idx < pvec0.size(); ++idx)
-        {
-            pvec1[idx] -= bestOffset;
-        }
-        
-        float rx = 0;
-        for (int tIdx = 0; tIdx < 10; ++tIdx)
-        {
-            float drx = 0;
-            float cosrx = cos(rx);
-            float sinrx = sin(rx);
-            for (size_t idx = 0; idx < pvec0.size(); ++idx)
-            {
-                drx += 2 * ((-pvec0[idx][2] * pvec1[idx][1] + pvec0[idx][1] * pvec1[idx][2]) * cosrx 
-                    + (pvec0[idx][1] * pvec1[idx][1] + pvec0[idx][2] * pvec1[idx][2]) * sinrx);
-            }
-
-            drx /= (float)pvec0.size();
-            rx -= drx * 0.05f;
-        }
 
         for (size_t idx = 0; idx < pvec0.size(); ++idx)
         {
-            pvec1[idx] = RotX(rx, pvec1[idx]);
+            pvec1[idx] += bestOffset;
         }
 
-        float ry = 0;
-        for (int tIdx = 0; tIdx < 10; ++tIdx)
+        Vec3f bestRot;
         {
-            float dry = 0;
-            float cosry = cos(ry);
-            float sinry = sin(ry);
-            for (size_t idx = 0; idx < pvec0.size(); ++idx)
+            Vec3f r(0, 0, 0);
+
+            for (int tIdx = 0; tIdx < 100; ++tIdx)
             {
-                dry += 2 * ((-pvec0[idx][2] * pvec1[idx][0] + pvec0[idx][0] * pvec1[idx][2]) * cosry +
-                    (pvec0[idx][0] * pvec1[idx][0] + pvec0[idx][2] * pvec1[idx][2]) * sinry);
+                Vec3f dr(0, 0, 0);
+                float rx = r[0];
+                float ry = r[1];
+                float rz = r[2];
+                float cosrx = cos(rx);
+                float cosry = cos(ry);
+                float cosrz = cos(rz);
+                float sinrx = sin(rx);
+                float sinry = sin(ry);
+                float sinrz = sin(rz);
+                for (size_t idx = 0; idx < pvec0.size(); ++idx)
+                {
+                    float px = pvec0[idx][0];
+                    float py = pvec0[idx][1];
+                    float pz = pvec0[idx][2];
+                    float qx = pvec1[idx][0];
+                    float qy = pvec1[idx][1];
+                    float qz = pvec1[idx][2];
+                    float nx = pnrm0[idx][0];
+                    float ny = pnrm0[idx][1];
+                    float nz = pnrm0[idx][2];
+
+                    float drx = 2 * (cosrx * (ny * qz * cosry + cosrz * (-nz * qy + ny * qx * sinry) - (nz * qx + ny * qy * sinry) * sinrz) + sinrx * (nz * qz * cosry + cosrz * (ny * qy + nz * qx * sinry) + (ny * qx - nz * qy * sinry) * sinrz)) * (nx * (px + qz * sinry + cosry * (-qx * cosrz + qy * sinrz)) + nz * (pz - sinrx * (qy * cosrz + qx * sinrz) - cosrx * (qz * cosry + sinry * (qx * cosrz - qy * sinrz))) + ny * (py - cosrx * (qy * cosrz + qx * sinrz) + sinrx * (qz * cosry + sinry * (qx * cosrz - qy * sinrz))));
+                    float dry = 2 * (sinry * (nz * qz * cosrx + nx * qx * cosrz - ny * qz * sinrx - nx * qy * sinrz) + cosry * (nx * qz + ny * qx * cosrz * sinrx - ny * qy * sinrx * sinrz + cosrx * (-nz * qx * cosrz + nz * qy * sinrz))) * (nx * (px + qz * sinry + cosry * (-qx * cosrz + qy * sinrz)) + nz * (pz - sinrx * (qy * cosrz + qx * sinrz) - cosrx * (qz * cosry + sinry * (qx * cosrz - qy * sinrz))) + ny * (py - cosrx * (qy * cosrz + qx * sinrz) + sinrx * (qz * cosry + sinry * (qx * cosrz - qy * sinrz))));
+                    float drz = 2 * (nx * cosry * (qy * cosrz + qx * sinrz) - sinrx * (nz * qx * cosrz + ny * qy * cosrz * sinry - nz * qy * sinrz + ny * qx * sinry * sinrz) + cosrx * (cosrz * (-ny * qx + nz * qy * sinry) + (ny * qy + nz * qx * sinry) * sinrz)) * (nx * (px + qz * sinry + cosry * (-qx * cosrz + qy * sinrz)) + nz * (pz - sinrx * (qy * cosrz + qx * sinrz) - cosrx * (qz * cosry + sinry * (qx * cosrz - qy * sinrz))) + ny * (py - cosrx * (qy * cosrz + qx * sinrz) + sinrx * (qz * cosry + sinry * (qx * cosrz - qy * sinrz))));
+                    dr += Vec3f(drx, dry, drz);
+                }
+
+                dr /= (float)pvec0.size();
+                r -= dr * 0.1f;
             }
 
-            dry /= (float)pvec0.size();
-            ry -= dry * 0.05f;
+            bestRot = r;
         }
-
-        for (size_t idx = 0; idx < pvec0.size(); ++idx)
-        {
-            pvec1[idx] = RotY(rx, pvec1[idx]);
-        }
-
-        float rz = 0;
-        for (int tIdx = 0; tIdx < 10; ++tIdx)
-        {
-            float drz = 0;
-            float cosrz = cos(rz);
-            float sinrz = sin(rz);
-            for (size_t idx = 0; idx < pvec0.size(); ++idx)
-            {
-                drz += 2 * ((-pvec0[idx][1] * pvec1[idx][0] + pvec0[idx][0] * pvec1[idx][1]) * cosrz + 
-                    (pvec0[idx][0] * pvec1[idx][0] + pvec0[idx][1] * pvec1[idx][1]) * sinrz);
-            }
-
-            drz /= (float)pvec0.size();
-            rz -= drz * 0.05f;
-        }
-
+        /*
         {
             float totalDist2 = 0;
             for (size_t idx = 0; idx < pvec0.size(); ++idx)
             {
-                Vec3f v = (pvec1[idx] - pvec0[idx]);
-                totalDist2 += lengthSquared(v);
+                pvec1[idx] = RotZ(bestRot[2], RotY(bestRot[1], RotX(bestRot[0], pvec1[idx])));
+                float dp = dot(pvec1[idx] - pvec0[idx], pnrm0[idx]);
+                totalDist2 += dp * dp;
             }
 
             char tmp[1024];
-            sprintf_s(tmp, "O=%f\n", totalDist2);
+            sprintf_s(tmp, "B=%f\n", totalDist2);
             OutputDebugStringA(tmp);
-        }
+        }*/
 
-        Vec3f rotate2(rx, ry, rz);
-        *outTranslate = -bestOffset;
-        *outRotate = rotate2;
+        *outTranslate = bestOffset;
+        //*outRotate = Vec3f(0, 0, 0);
+        *outRotate = bestRot;
     }
+
+    void DepthBuildLods(float* dbuf, float* outpts, int depthWidth, int depthHeight);
+
 
     __declspec (dllexport) void CalcScores()
     {
