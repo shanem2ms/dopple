@@ -115,7 +115,9 @@
       <SubType>Designer</SubType>
     </ApplicationDefinition>
     <Compile Include="Aligner.cs" />
+    <Compile Include="CameraTrackVis.cs" />
     <Compile Include="Colors.cs" />
+    <Compile Include="PlanesVis.cs" />
     <Compile Include="DepthPtsVis.cs" />
     <Compile Include="DepthVis.cs" />
     <Compile Include="DeviceMotionVis.cs" />
@@ -125,6 +127,7 @@
     <Compile Include="MotionRenderer.cs" />
     <Compile Include="OpenCV.cs" />
     <Compile Include="PtCloudAligner.cs" />
+    <Compile Include="PlanesRenderer.cs" />
     <Compile Include="PtsRenderer.cs" />
     <Compile Include="Recording.cs" />
     <Compile Include="SceneRenderer.cs" />

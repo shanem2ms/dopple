@@ -137,6 +137,8 @@
             <TextBox Text="{Binding Path=Blur, UpdateSourceTrigger=LostFocus}"/>
             <Label Content="DepthLod" />
             <TextBox Text="{Binding DepthLod, UpdateSourceTrigger=LostFocus}"/>
+            <Label Content="FrameDelta" />
+            <TextBox Text="{Binding Path=FrameDelta, UpdateSourceTrigger=LostFocus}"/>
         </StackPanel>
         <ContentControl Grid.Row="1" Grid.Column="2" Content="{Binding AR}"/>
         <ContentControl Margin="10,10.333,10.333,9.667" Grid.Row="3" Grid.Column="1" Content="{Binding ActiveRecording}" />

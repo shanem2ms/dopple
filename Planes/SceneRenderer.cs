@@ -32,6 +32,7 @@ namespace Planes
         VideoVis[] videoVis = new VideoVis[2];
         RenderTarget[] quads = new RenderTarget[2];
         SceneVis sceneVis;
+        CameraTrackVis camTrackVis;
         Selection selVis;
         RenderTarget pickTarget;
 
@@ -102,30 +103,9 @@ namespace Planes
 
         public float TotalDist { get; private set; } = 0;
 
-        Vector3 rotate_vector_by_quaternion(Vector3 v, Quaternion q)
-        {
-            // Extract the vector part of the quaternion
-            Vector3 u = new Vector3(q.X, q.Y, q.Z);
-
-            // Extract the scalar part of the quaternion
-            float s = q.W;
-
-            // Do the math
-            return 2.0f * Vector3.Dot(u, v) * u
-              + (s * s - Vector3.Dot(u, u)) * v
-              + 2.0f * s * Vector3.Cross(u, v);
-        }
-
-
-
         public SceneRenderer()
         {
             App.Recording.OnFrameChanged += Recording_OnFrameChanged;
-
-            Vector3 v = new Vector3(10, 11, 12);
-            Quaternion q = Quaternion.FromAxisAngle(new Vector3(1, 2, 3).Normalized(), 1.0f);
-            Vector3 vp = q * v;
-            Vector3 vp2 = rotate_vector_by_quaternion(v, q);
         }
 
         private void Recording_OnFrameChanged(object sender, int e)
@@ -147,10 +127,10 @@ namespace Planes
         public override void Load()
         {
             sceneVis = new SceneVis();
+            camTrackVis = new CameraTrackVis();
             for (int i = 0; i < 2; ++i)
             {
                 videoVis[i] = new VideoVis(i);
-                
             }
             selVis = new Selection();
         }
@@ -176,111 +156,111 @@ namespace Planes
             return new Vector3(v.X * cosC - v.Y * sinC, v.X * sinC + v.Y * cosC, v.Z);
         }
 
-        NrmPt[][] GetNrmPts(int curFrame)
+        NrmPt[] GetNrmPts(int curFrame)
         {
-            NrmPt[][] ptArrays = new NrmPt[2][];
-            for (int idx = 0; idx < 2; ++idx)
+            VideoFrame vf = App.Recording.Frames[curFrame].vf;
+            int dw = vf.DepthWidth;
+            int dh = vf.DepthHeight;
+
+            float invWidth = 1.0f / vf.ImageWidth * dw;
+            float invHeight = 1.0f / vf.ImageHeight * dh;
+
+            var pts = vf.CalcDepthPoints();
+            NrmPt[] ptArray = new NrmPt[dh * dw];
+            foreach (var p in pts)
             {
-                VideoFrame vf = App.Recording.Frames[curFrame + idx].vf;
-                int dw = vf.DepthWidth;
-                int dh = vf.DepthHeight;
-
-                float invWidth = 1.0f / vf.ImageWidth * dw;
-                float invHeight = 1.0f / vf.ImageHeight * dh;
-
-                var pts = vf.CalcDepthPoints();
-                NrmPt[] ptArray = new NrmPt[dh * dw];
-                ptArrays[idx] = ptArray;
-                foreach (var p in pts)
-                {
-                    ptArray[p.Key] = new NrmPt() { pt = p.Value.pt, spt = p.Value.spt };
-                }
-
-                for (int y = 0; y < (dh - 1); ++y)
-                {
-                    for (int x = 0; x < (dw - 1); ++x)
-                    {
-                        if (ptArray[(y) * dw + (x)] == null)
-                            continue;
-                        NrmPt[] borders = { ptArray[(y + 1) * dw + (x + 1)],
-                            ptArray[(y + 1) * dw + (x)],
-                            ptArray[(y) * dw + (x + 1)],
-                            ptArray[(y) * dw + (x)] };
-
-                        var validPts = borders.Where(a => a != null);
-                        if (validPts.Count() < 3)
-                            continue;
-                        NrmPt[] vpts = validPts.ToArray();
-                        ptArray[(y) * dw + (x)].nrm = Vector3.Cross((vpts[0].pt - vpts[1].pt).Normalized(),
-                                                (vpts[2].pt - vpts[0].pt).Normalized());
-                    }
-                }
-
+                ptArray[p.Key] = new NrmPt() { pt = p.Value.pt, spt = p.Value.spt };
             }
 
-            return ptArrays;
+            for (int y = 0; y < (dh - 1); ++y)
+            {
+                for (int x = 0; x < (dw - 1); ++x)
+                {
+                    if (ptArray[(y) * dw + (x)] == null)
+                        continue;
+                    NrmPt[] borders = { ptArray[(y + 1) * dw + (x + 1)],
+                        ptArray[(y + 1) * dw + (x)],
+                        ptArray[(y) * dw + (x + 1)],
+                        ptArray[(y) * dw + (x)] };
+
+                    var validPts = borders.Where(a => a != null);
+                    if (validPts.Count() < 3)
+                        continue;
+                    NrmPt[] vpts = validPts.ToArray();
+                    ptArray[(y) * dw + (x)].nrm = Vector3.Cross((vpts[0].pt - vpts[1].pt).Normalized(),
+                                            (vpts[2].pt - vpts[0].pt).Normalized());
+                }
+            }
+
+            return ptArray;
         }
 
-        List<NrmPt[]> framePts = null;
+        Matrix4 []frameMatrix = null;
+        int nFramesProcessed = 0;
+        int nFramesShown = 0;
         bool framesReady = false;
+
+        NrmPt[][] framePts = null;
+
+        void StartBkProcess()
+        {
+            frameMatrix = new Matrix4[App.Recording.NumFrames];
+            Thread t = new Thread(() =>
+            {
+                int startFrame = 0;
+                int endFrame = App.Recording.NumFrames - 1;
+                Matrix4 totalMatrix = Matrix4.Identity;
+
+                frameMatrix[0] = totalMatrix;
+                var vfcam = App.Recording.Frames[0].vf;
+                float[] camvals = new float[6]
+                {
+                    vfcam.cameraCalibrationVals.X,
+                    vfcam.cameraCalibrationVals.Y,
+                    vfcam.cameraCalibrationVals.Z,
+                    vfcam.cameraCalibrationVals.W,
+                    vfcam.cameraCalibrationDims.X,
+                    vfcam.cameraCalibrationDims.Y
+                };
+
+                int dw = App.Recording.Frames[0].vf.DepthWidth;
+                int dh = App.Recording.Frames[0].vf.depthHeight;
+                for (int curFrame = startFrame; curFrame < endFrame; ++curFrame)
+                {
+                    Matrix4 outMat;
+                    var vf0 = App.Recording.Frames[curFrame].vf;
+                    var vf1 = App.Recording.Frames[curFrame + 1].vf;
+                    Aligner.AlignBest(vf0.depthData, vf1.depthData, camvals,
+                        vf0.depthWidth, vf0.depthHeight, out outMat);
+
+                    totalMatrix = outMat * totalMatrix;
+                    frameMatrix[curFrame + 1] = totalMatrix;
+                    nFramesProcessed = curFrame + 2;
+                    isDirty = true;
+                }
+
+                framesReady = true;
+            });
+            t.Start();
+        }
+
         void UpdateFrame()
         {
             if (framePts == null)
+                framePts = new NrmPt[App.Recording.NumFrames][];
+            for (int idx = 0; idx <= App.Recording.CurrentFrameIdx; ++idx)
             {
-                framePts = new List<NrmPt[]>();
-                Thread t = new Thread(() =>
-                {
-                    int startFrame = 0;
-                    int endFrame = App.Recording.NumFrames - 1;
-                    Matrix4 totalMatrix = Matrix4.Identity;
-
-                    int dw = App.Recording.Frames[0].vf.DepthWidth;
-                    int dh = App.Recording.Frames[0].vf.depthHeight;
-                    for (int curFrame = startFrame; curFrame < endFrame; ++curFrame)
-                    {
-                        NrmPt[][] ptArrays = GetNrmPts(curFrame);
-                        Vector3[] parr0 = ptArrays[0].Select(p => p.pt).ToArray();
-                        Vector3[] nrm0 = ptArrays[0].Select(p => p.nrm).ToArray();
-                        Vector3[] parr1 = ptArrays[1].Select(p => p.pt).ToArray();
-                        Vector3 outOffset, outERot;
-                        Aligner.Align(parr0, nrm0, parr1, dw, dh, out outOffset, out outERot);
-                        Matrix4 mat = Matrix4.CreateTranslation(outOffset) *
-                            Matrix4.CreateFromQuaternion(
-                                Quaternion.FromEulerAngles(new Vector3(outERot.X, -outERot.Y, outERot.Z)));
-                        totalMatrix = mat * totalMatrix;
-
-                        if (curFrame == startFrame)
-                        {
-                            var arr = ptArrays[0].Select(n => new NrmPt()
-                            {
-                                pt = n.pt,
-                                nrm = n.nrm,
-                                spt = n.spt
-                            }).ToArray();
-                            framePts.Add(arr);
-                        }
-                        {
-                            var arr = ptArrays[1].Select(n => new NrmPt()
-                            {
-                                pt = Vector3.TransformPosition(n.pt, totalMatrix),
-                                nrm = n.nrm,
-                                spt = n.spt
-                            }).ToArray();
-                            framePts.Add(arr);
-                        }
-                    }
-
-                    framesReady = true;
-                });
-                t.Start();
+                if (framePts[idx] == null)
+                    framePts[idx] = GetNrmPts(idx);
             }
+            var vfcam = App.Recording.Frames[0].vf;
 
-            if (framesReady)
-            {
-                this.sceneVis.UpdateFrame(App.Recording.CurrentFrame.vf, 
-                    framePts.GetRange(0, App.Recording.CurrentFrameIdx));
-                isDirty = false;
-            }
+            var framePtsList = frameMatrix.Zip(framePts, (x, y) => new Tuple<Matrix4, NrmPt[]>(x, y)).ToList().GetRange(0,
+                App.Recording.CurrentFrameIdx + 1);
+            this.sceneVis.UpdateFrame(vfcam, framePtsList, App.Recording.CurrentFrameIdx, 10);
+            nFramesShown = nFramesProcessed;
+            this.camTrackVis.UpdateFrame(vfcam, frameMatrix, App.Recording.CurrentFrameIdx, nFramesShown);
+            isDirty = false;
         }
 
         void RecalcTotalDist(Vector3[] parr0, Vector3[] pnrm0, Vector3[] parr1, int[] matches)
@@ -300,9 +280,17 @@ namespace Planes
 
         public override void Paint()
         {
+            if (frameMatrix == null)
+            {
+                StartBkProcess();
+            }
             if (isDirty)
             {
                 UpdateFrame();
+            }
+            else if (nFramesShown != nFramesProcessed)
+            {
+
             }
             FrameBuffer.BindNone();
             GL.Disable(EnableCap.Blend);
@@ -319,6 +307,8 @@ namespace Planes
                 GL.Enable(EnableCap.DepthTest);
                 if (i == 0)
                     sceneVis.Render(viewProj, false, false);
+                else
+                    camTrackVis.Render(viewProj, false, false);
                 this.selVis.Draw(viewProj);
             }
             FrameBuffer.BindNone();

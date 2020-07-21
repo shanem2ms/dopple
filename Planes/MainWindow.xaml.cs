@@ -34,14 +34,15 @@ namespace Planes
         IRenderer[] renderers = new IRenderer[] {
                 new VideoRenderer(),
                 new DepthRenderer(),
-                new PtsRenderer(), 
+                new PtsRenderer(),
+                new PlanesRenderer(),
                 new MotionRenderer(),
                 new SceneRenderer()};
         System.Timers.Timer renderTimer = new System.Timers.Timer();
 
         public Settings Settings => App.Settings;
 
-        public IRenderer AR => renderers[2];
+        public IRenderer AR => renderers[5];
 
         public MainWindow()
         {

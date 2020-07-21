@@ -184,7 +184,7 @@ namespace Dopple
             this.OnFrameProcessed += Recording_OnFrameProcessed;
             recavg /= avgweight;
 
-            this.curFrameIdx = 187;
+            this.curFrameIdx = 0;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("NumFrames"));
         }
 

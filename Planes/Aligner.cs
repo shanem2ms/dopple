@@ -26,6 +26,9 @@ namespace Planes
             IntPtr outRotate);
 
         [DllImport("ptslib.dll")]
+        public static extern void BestFitAll(IntPtr pts0, IntPtr pts1, int dw, int dh, IntPtr camMatrix, IntPtr outAlignTransform);
+
+        [DllImport("ptslib.dll")]
         public static extern void CalcScores();
 
         [DllImport("ptslib.dll")]
@@ -103,6 +106,27 @@ namespace Planes
             eRot = (Vector3)Marshal.PtrToStructure(rotatePtr, typeof(Vector3));
             Marshal.FreeHGlobal(translatePtr);
             Marshal.FreeHGlobal(rotatePtr);
+        }
+
+        public static void AlignBest(byte []depthData0, byte[] depthData1,
+            float []cameraVals,
+            int dw, int dh,
+            out Matrix4 alignTransform)
+        {
+            IntPtr mpts0 = Marshal.AllocHGlobal(depthData0.Length);
+            Marshal.Copy(depthData0, 0, mpts0, depthData0.Length);
+            IntPtr mpts1 = Marshal.AllocHGlobal(depthData1.Length);
+            Marshal.Copy(depthData1, 0, mpts1, depthData1.Length);
+            IntPtr camPtr = Marshal.AllocHGlobal(sizeof(float) * cameraVals.Length);
+            Marshal.Copy(cameraVals, 0, camPtr, cameraVals.Length);
+
+            IntPtr transformPtr = Marshal.AllocHGlobal(sizeof(float) * 16);
+            DPEngine.BestFitAll(mpts0, mpts1, dw, dh, camPtr, transformPtr);
+            Marshal.FreeHGlobal(mpts0);
+            Marshal.FreeHGlobal(mpts1);
+            Marshal.FreeHGlobal(camPtr);
+            alignTransform = (Matrix4)Marshal.PtrToStructure(transformPtr, typeof(Matrix4));
+            Marshal.FreeHGlobal(transformPtr);
         }
     }
 }

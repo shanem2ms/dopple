@@ -155,7 +155,7 @@ namespace Planes
             for (int i = 0; i < 2; ++i)
             {
                 videoVis[i] = new VideoVis(i);
-                depthVis[i] = new DepthPtsVis(i, true);
+                depthVis[i] = new DepthPtsVis(i);
             }
             matchVis = new MatchVis();
             selVis = new Selection();
@@ -187,7 +187,7 @@ namespace Planes
             NrmPt[][] ptArrays = new NrmPt[2][];
             for (int idx = 0; idx < 2; ++idx)
             {
-                VideoFrame vf = App.Recording.Frames[curFrame + idx].vf;
+                VideoFrame vf = App.Recording.Frames[curFrame + (idx * App.Settings.FrameDelta)].vf;
                 int dw = vf.DepthWidth;
                 int dh = vf.DepthHeight;
 
@@ -232,8 +232,8 @@ namespace Planes
         void UpdateFrame()
         {
             int curFrame = App.Recording.CurrentFrameIdx;
-            if (curFrame >= App.Recording.Frames.Count - 1)
-                curFrame = App.Recording.Frames.Count - 2;
+            if (curFrame >= App.Recording.Frames.Count - App.Settings.FrameDelta)
+                curFrame = App.Recording.Frames.Count - (App.Settings.FrameDelta + 1);
 
             Matrix4 mat = Matrix4.CreateTranslation(offsetTranslation) *
                 Matrix4.CreateFromQuaternion(
@@ -242,7 +242,7 @@ namespace Planes
             NrmPt[][] ptArrays = GetNrmPts(curFrame);
             for (int idx = 0; idx < 2; ++idx)
             {
-                VideoFrame vf = App.Recording.Frames[curFrame + idx].vf;
+                VideoFrame vf = App.Recording.Frames[curFrame + (idx * App.Settings.FrameDelta)].vf;
                 var arr = ptArrays[idx];
                 if (idx == 1)
                 {
@@ -292,11 +292,66 @@ namespace Planes
         }
 
 
+        struct EulerAngles
+        {
+            public double roll, pitch, yaw;
+        };
+
+        static EulerAngles ToEulerAngles(Quaternion q)
+        {
+            EulerAngles angles;
+
+            // roll (x-axis rotation)
+            double sinr_cosp = 2 * (q.W * q.X + q.Y * q.Z);
+            double cosr_cosp = 1 - 2 * (q.X * q.X + q.Y * q.Y);
+            angles.pitch = Math.Atan2(sinr_cosp, cosr_cosp);
+
+            // pitch (y-axis rotation)
+            double sinp = 2 * (q.W * q.Y - q.Z * q.X);
+            if (Math.Abs(sinp) >= 1)
+                angles.yaw = Math.PI / 2 * Math.Sign(sinp); // use 90 degrees if out of range
+            else
+                angles.yaw = Math.Asin(sinp);
+
+            // yaw (z-axis rotation)
+            double siny_cosp = 2 * (q.W * q.Z + q.X * q.Y);
+            double cosy_cosp = 1 - 2 * (q.Y * q.Y + q.Z * q.Z);
+            angles.roll = Math.Atan2(siny_cosp, cosy_cosp);
+
+            return angles;
+        }
+
+
         void Align(out Vector3 outOffset, out Vector3 outERot)
         {
             int curFrame = App.Recording.CurrentFrameIdx;
-            if (curFrame >= App.Recording.Frames.Count - 1)
-                curFrame = App.Recording.Frames.Count - 2;
+            if (curFrame >= App.Recording.Frames.Count - App.Settings.FrameDelta)
+                curFrame = App.Recording.Frames.Count - (App.Settings.FrameDelta + 1);
+            var vf0 = App.Recording.Frames[curFrame].vf;
+            var vf1 = App.Recording.Frames[curFrame + App.Settings.FrameDelta].vf;
+            float[] camvals = new float[6]
+            {
+                vf0.cameraCalibrationVals.X,
+                vf0.cameraCalibrationVals.Y,
+                vf0.cameraCalibrationVals.Z,
+                vf0.cameraCalibrationVals.W,
+                vf0.cameraCalibrationDims.X,
+                vf0.cameraCalibrationDims.Y
+            };
+            Matrix4 outMat;
+            Aligner.AlignBest(vf0.depthData, vf1.depthData, camvals,
+                vf0.depthWidth, vf0.depthHeight, out outMat);
+            Quaternion q = outMat.ExtractRotation();
+            EulerAngles ea = ToEulerAngles(q);
+            outERot = new Vector3((float)ea.pitch, (float)ea.yaw, (float)ea.roll);
+            outOffset = outMat.ExtractTranslation();
+        }
+
+        void Align1(out Vector3 outOffset, out Vector3 outERot)
+        {
+            int curFrame = App.Recording.CurrentFrameIdx;
+            if (curFrame >= App.Recording.Frames.Count - App.Settings.FrameDelta)
+                curFrame = App.Recording.Frames.Count - (App.Settings.FrameDelta + 1);
             NrmPt[][] ptArrays = GetNrmPts(curFrame);
             Vector3[] parr0 = ptArrays[0].Select(p => p.pt).ToArray();
             Vector3[] nrm0 = ptArrays[0].Select(p => p.nrm).ToArray();
