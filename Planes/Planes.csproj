@@ -139,6 +139,7 @@
     <Compile Include="DepthRenderer.cs" />
     <Compile Include="VideoRenderer.cs" />
     <Compile Include="VideoVis.cs" />
+    <Compile Include="WorldVis.cs" />
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>

@@ -12,6 +12,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Windows.Documents;
 using OpenCvSharp;
+using System.Diagnostics;
 
 namespace Planes
 {
@@ -32,6 +33,7 @@ namespace Planes
         VideoVis[] videoVis = new VideoVis[2];
         RenderTarget[] quads = new RenderTarget[2];
         SceneVis sceneVis;
+        WorldVis worldVis;
         CameraTrackVis camTrackVis;
         Selection selVis;
         RenderTarget pickTarget;
@@ -52,6 +54,7 @@ namespace Planes
         int[] matches;
         Vector3 offsetTranslation = Vector3.Zero;
         Vector3 offsetTranslationMsDn = Vector3.Zero;
+        Vector3[] worldPts = null;
         float multiplier = 0.01f;
         public float OffsetTranslationX
         {
@@ -127,6 +130,7 @@ namespace Planes
         public override void Load()
         {
             sceneVis = new SceneVis();
+            worldVis = new WorldVis();
             camTrackVis = new CameraTrackVis();
             for (int i = 0; i < 2; ++i)
             {
@@ -202,6 +206,25 @@ namespace Planes
 
         NrmPt[][] framePts = null;
 
+        Vector4 FromD(Vector4d v)
+        {
+            return new Vector4((float)v.X, (float)v.Y, (float)v.Z, (float)v.W);
+        }
+        Vector4d ToD(Vector4 v)
+        {
+            return new Vector4d(v.X, v.Y, v.Z, v.W);
+        }
+
+
+        Matrix4 FromD(Matrix4d m)
+        {
+            return new Matrix4(FromD(m.Row0), FromD(m.Row1), FromD(m.Row2), FromD(m.Row3));
+        }
+        Matrix4d ToD(Matrix4 m)
+        {
+            return new Matrix4d(ToD(m.Row0), ToD(m.Row1), ToD(m.Row2), ToD(m.Row3));
+        }
+
         void StartBkProcess()
         {
             frameMatrix = new Matrix4[App.Recording.NumFrames];
@@ -209,9 +232,9 @@ namespace Planes
             {
                 int startFrame = 0;
                 int endFrame = App.Recording.NumFrames - 1;
-                Matrix4 totalMatrix = Matrix4.Identity;
+                Matrix4d totalMatrix = Matrix4d.Identity;
 
-                frameMatrix[0] = totalMatrix;
+                frameMatrix[0] = FromD(totalMatrix);
                 var vfcam = App.Recording.Frames[0].vf;
                 float[] camvals = new float[6]
                 {
@@ -233,10 +256,17 @@ namespace Planes
                     Aligner.AlignBest(vf0.depthData, vf1.depthData, camvals,
                         vf0.depthWidth, vf0.depthHeight, out outMat);
 
-                    totalMatrix = outMat * totalMatrix;
-                    frameMatrix[curFrame + 1] = totalMatrix;
+                    totalMatrix = ToD(outMat) * totalMatrix;
+
+                    Aligner.AddWorldPoints(vf1.depthData, camvals, vf1.depthWidth, vf1.depthHeight, 
+                        FromD(totalMatrix));
+                    frameMatrix[curFrame + 1] = FromD(totalMatrix);
                     nFramesProcessed = curFrame + 2;
                     isDirty = true;
+                    if ((curFrame % 10) == 0)
+                    {
+                        worldPts = Aligner.GetWorldPoints();
+                    }
                 }
 
                 framesReady = true;
@@ -258,6 +288,10 @@ namespace Planes
             var framePtsList = frameMatrix.Zip(framePts, (x, y) => new Tuple<Matrix4, NrmPt[]>(x, y)).ToList().GetRange(0,
                 App.Recording.CurrentFrameIdx + 1);
             this.sceneVis.UpdateFrame(vfcam, framePtsList, App.Recording.CurrentFrameIdx, 10);
+            if (this.worldPts != null)
+            {
+                this.worldVis.UpdateFrame(this.worldPts);
+            }
             nFramesShown = nFramesProcessed;
             this.camTrackVis.UpdateFrame(vfcam, frameMatrix, App.Recording.CurrentFrameIdx, nFramesShown);
             isDirty = false;
@@ -306,7 +340,7 @@ namespace Planes
                 GL.Enable(EnableCap.Blend);
                 GL.Enable(EnableCap.DepthTest);
                 if (i == 0)
-                    sceneVis.Render(viewProj, false, false);
+                    worldVis.Render(viewProj, false, false);
                 else
                     camTrackVis.Render(viewProj, false, false);
                 this.selVis.Draw(viewProj);

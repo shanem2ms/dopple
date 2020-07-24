@@ -29,6 +29,15 @@ namespace Planes
         public static extern void BestFitAll(IntPtr pts0, IntPtr pts1, int dw, int dh, IntPtr camMatrix, IntPtr outAlignTransform);
 
         [DllImport("ptslib.dll")]
+        public static extern void AddWorldPoints(IntPtr pts, int dw, int dh, IntPtr camMatrix, IntPtr transform);
+
+        [DllImport("ptslib.dll")]
+        public static extern int GetWorldNumPts();
+
+        [DllImport("ptslib.dll")]
+        public static extern int GetWorldPoints(IntPtr outpts);
+
+        [DllImport("ptslib.dll")]
         public static extern void CalcScores();
 
         [DllImport("ptslib.dll")]
@@ -55,6 +64,17 @@ namespace Planes
             Marshal.Copy(vals, 0, mpts0, vals.Length);
         }
 
+        public static void CopyToVec3Array(IntPtr mpts0, Vector3[] pos)
+        {
+            float[] vals = new float[pos.Length * 3];
+            Marshal.Copy(mpts0, vals, 0, vals.Length);
+            for (int idx = 0; idx < pos.Length; ++idx)
+            {
+                pos[idx] = new Vector3(vals[idx * 3],
+                    vals[idx * 3 + 1],
+                    vals[idx * 3 + 2]);
+            }
+        }
 
         public static Matrix4 MatrixDToF(Matrix4d m)
         {
@@ -128,5 +148,36 @@ namespace Planes
             alignTransform = (Matrix4)Marshal.PtrToStructure(transformPtr, typeof(Matrix4));
             Marshal.FreeHGlobal(transformPtr);
         }
+
+        public static Vector3 []GetWorldPoints()
+        {
+            int numPts = DPEngine.GetWorldNumPts();
+            IntPtr ptsPtr = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(Vector3)) * numPts);
+            DPEngine.GetWorldPoints(ptsPtr);
+            Vector3[] outPts = new Vector3[numPts];
+            DPEngine.CopyToVec3Array(ptsPtr, outPts);
+            Marshal.FreeHGlobal(ptsPtr);
+            return outPts;
+        }
+
+        public static void AddWorldPoints(byte[] depthData,
+            float[] cameraVals,
+            int dw, int dh,
+            Matrix4 transform)
+        {
+            IntPtr mpts0 = Marshal.AllocHGlobal(depthData.Length);
+            Marshal.Copy(depthData, 0, mpts0, depthData.Length);
+            IntPtr camPtr = Marshal.AllocHGlobal(sizeof(float) * cameraVals.Length);
+            Marshal.Copy(cameraVals, 0, camPtr, cameraVals.Length);
+            IntPtr transformPtr = Marshal.AllocHGlobal(sizeof(float) * 16);
+            Marshal.StructureToPtr(transform, transformPtr, false);
+
+            DPEngine.AddWorldPoints(mpts0, dw, dh, camPtr, transformPtr);
+            Marshal.FreeHGlobal(mpts0);
+            Marshal.FreeHGlobal(camPtr);
+            Marshal.FreeHGlobal(transformPtr);
+        }
+
+
     }
 }

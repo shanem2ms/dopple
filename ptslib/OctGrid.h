@@ -201,19 +201,9 @@ public:
 };
 
 
-const uint32 GridEmptyVal<float>::emptyValHx = 0xFFFFFFFF;
-const float GridEmptyVal<float>::Val = *(float*)(&emptyValHx);
-const uint32 GridEmptyVal<uint32>::emptyValHx = 0xFFFFFFFF;
-const uint32 GridEmptyVal<uint32>::Val = *(uint32*)(&emptyValHx);
-const uchar GridEmptyVal<uchar>::Val = 0xFF;
-
 template <> class GridEmptyVal<Vec3f>
 {
 public:
 	static const uint32 emptyValHx;
 	static const Vec3f Val;
 };
-
-const uint32 GridEmptyVal<Vec3f>::emptyValHx = 0xFFFFFFFF;
-const Vec3f GridEmptyVal<Vec3f>::Val =
-Vec3f(*(float*)(&emptyValHx), *(float*)(&emptyValHx), *(float*)(&emptyValHx));

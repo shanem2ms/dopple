@@ -42,7 +42,7 @@ namespace Planes
 
         public Settings Settings => App.Settings;
 
-        public IRenderer AR => renderers[5];
+        public IRenderer AR => renderers[1];
 
         public MainWindow()
         {

@@ -36,16 +36,18 @@ AddPoint(const PointType& pt)
 template <typename ValueType, int M, int ML> void OctNode<ValueType, M, ML>::
 GetLeafNodes(std::vector<const OctNode*>& leafNodes, bool getEmptyNodes) const
 {
-	if (m_children.size() > 0 && m_pts.size() > 0)
-		__debugbreak();
+	std::vector<std::shared_ptr<OctNode>> children;
+	m_csNode.lock();
+	children = m_children;
+	m_csNode.unlock();
 
-	if (m_children.size() == 0 &&
+	if (children.size() == 0 &&
 		(getEmptyNodes || m_pts.size() > 0))
 	{
 		leafNodes.push_back(this);
 	}
 
-	for (const std::shared_ptr<OctNode>& child : m_children)
+	for (const std::shared_ptr<OctNode>& child : children)
 	{
 		child->GetLeafNodes(leafNodes, getEmptyNodes);
 	}
@@ -54,9 +56,9 @@ GetLeafNodes(std::vector<const OctNode*>& leafNodes, bool getEmptyNodes) const
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template <typename ValueType, int M, int ML> OctNode<ValueType, M, ML>& OctNode<ValueType, M, ML>::
-AddPoint(const OctTree<ValueType, M, ML>& tree, const OctTreeLoc& loc, const PointType& pt)
+	AddPoint(const OctTree<ValueType, M, ML>& tree, const OctTreeLoc& loc, const PointType& pt)
 {
-	m_csNode.Acquire();
+	m_csNode.lock();
 	if (m_isLeaf)
 	{
 		m_pts.push_back(std::make_pair(loc, pt));
@@ -78,22 +80,51 @@ AddPoint(const OctTree<ValueType, M, ML>& tree, const OctTreeLoc& loc, const Poi
 			m_pts = std::vector<std::pair<OctTreeLoc, PointType>>();
 			m_isLeaf = false;
 		}
-		m_csNode.Release();
+		m_csNode.unlock();
 	}
 	else
 	{
 		size_t childIdx = m_loc.IndexOfChild(loc);
-		m_csNode.Release();
+		m_csNode.unlock();
 		m_children[childIdx]->AddPoint(tree, loc, pt);
 	}
 	return *this;
+}
+
+template <typename ValueType, int M, int ML> void OctNode<ValueType, M, ML>::ConsolidatePts()
+{
+	std::vector<std::shared_ptr<OctNode>> children;
+	m_csNode.lock();
+	children = m_children;
+	m_csNode.unlock();
+
+	if (children.size() == 0 && m_pts.size() > 0)
+	{
+		m_csNode.lock();
+		std::sort(m_pts.begin(), m_pts.end(), [](const std::pair<OctTreeLoc, PointType>& lhs, const std::pair<OctTreeLoc, PointType>& rhs)
+			{
+				return lhs.first < rhs.first;
+			});
+		auto itUnique = std::unique(m_pts.begin(), m_pts.end(), [](const std::pair<OctTreeLoc, PointType>& lhs, const std::pair<OctTreeLoc, PointType>& rhs)
+			{
+				return lhs.first == rhs.first;
+			});
+		if (itUnique != m_pts.end())
+		{
+			m_pts.erase(itUnique, m_pts.end());
+		}
+		m_csNode.unlock();
+	}
+
+	for (const std::shared_ptr<OctNode>& child : children)
+	{
+		child->ConsolidatePts();
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Instantiations
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template class WX_EXPORT_SHARED OctTree<size_t, 64, 8>;
-template class WX_EXPORT_SHARED OctTree<size_t, 64, 9>;
-template class WX_EXPORT_SHARED OctTree<wxfloat32, 1, 9>;
+template class OctTree<Point3f, 64, 9>;
 

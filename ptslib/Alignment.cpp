@@ -8,6 +8,7 @@
 #include <vector>
 #include <string>
 #include <sstream>
+#include "OctTree.h"
 
 using namespace gmtl;
 
@@ -1135,6 +1136,92 @@ extern "C" {
         size_t vidx = ival % dcnt;
         float r = ((int)ridx - cnt) * rscale;
         float v = ((int)vidx - cnt) * vscale;
+    }
+
+
+    AABoxf g_minmax;
+
+    inline void AAExpand(AABoxf& aabox, const Point3f& v)
+    {
+        for (int i = 0; i < 3; ++i)
+        {
+            if (v[i] < aabox.mMin[i])
+                aabox.mMin[i] = v[i];
+            if (v[i] > aabox.mMax[i])
+                aabox.mMax[i] = v[i];
+        }
+    }
+
+    void AddWorldPointsToTree(const std::vector<Point3f>& pts);
+
+    __declspec (dllexport) void AddWorldPoints(float* vals, int width, int height,
+        float* cameraVals,
+        Matrix44f *transform)
+    {
+        Vec4f cameraCalibrationVals;
+        Vec2f cameraCalibrationDims;
+        memcpy(&cameraCalibrationVals, cameraVals, sizeof(float) * 4);
+        memcpy(&cameraCalibrationDims, cameraVals + 4, sizeof(float) * 2);
+
+        int dw = width;
+        int dh = height;
+
+        int totalFloats = 0;
+        int nLods = 0;
+        while (dw >= 32)
+        {
+            dw /= 2;
+            dh /= 2;
+
+            totalFloats += (dw * dh);
+            nLods++;
+        }
+
+
+        std::vector<vfloat> dlods[8];
+        std::vector<vfloat> depthLods;
+        depthLods.resize(totalFloats);
+        DepthBuildLods(vals, depthLods.data(), width, height);
+
+        dw = width;
+        dh = height;
+
+        vfloat* ptr = depthLods.data();
+        size_t offset = 0;
+        for (int i = 0; i < nLods; ++i)
+        {
+            dw /= 2;
+            dh /= 2;
+
+            dlods[i].resize(dw * dh);
+            memcpy(dlods[i].data(), ptr + offset, dw * dh * sizeof(vfloat));
+            offset += dw * dh;
+        }
+
+        int curLod = 2;
+        dw = width >> curLod;
+        dh = height >> curLod;
+
+        Matrix44f camMatrix =
+            CameraMat(cameraCalibrationVals, cameraCalibrationDims, dw, dh);
+
+        std::vector<Point3f> pts0;
+        float* lodVals = dlods[curLod - 1].data();
+        pts0.resize(dlods[curLod - 1].size());
+        CalcDepthPts(camMatrix, lodVals, dw, dh, pts0.data());
+
+        for (auto itPt = pts0.begin(); itPt != pts0.end(); ++itPt)
+        {
+            gmtl::xform(*itPt, *transform, *itPt);
+            AAExpand(g_minmax, *itPt);
+        }
+
+        AddWorldPointsToTree(pts0);
+        /*
+        std::ostringstream str;
+        str << g_minmax << std::endl;
+        OutputDebugStringA(str.str().c_str());*/
+        AddWorldPointsToTree(pts0);
     }
 }
 
