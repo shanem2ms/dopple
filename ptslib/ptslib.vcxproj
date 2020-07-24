@@ -101,6 +101,7 @@
     <ClInclude Include="OctTreeLoc.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="Pt.h" />
+    <ClInclude Include="PtsLib.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Alignment.cpp" />

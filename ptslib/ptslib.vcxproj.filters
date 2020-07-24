@@ -33,6 +33,9 @@
     <ClInclude Include="OctTree.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="PtsLib.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">

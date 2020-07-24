@@ -998,36 +998,6 @@ extern "C" {
     }
 
 
-    Matrix44f CameraMat(const Vec4f &cameraCalibrationVals,
-        const Vec2f & cameraCalibrationDims,
-        int dw, int dh)
-    {
-        float ratioX = cameraCalibrationDims[0] / dw;
-        float ratioY = cameraCalibrationDims[1] / dh;
-        Vec4f cMat = cameraCalibrationVals;
-        float xScl = ratioX / cMat[0];
-        float yScl = ratioY / cMat[1];
-        float xOff = cMat[2] / ratioX + (30 * dw / 640);
-        float yOff = cMat[3] / ratioY;
-        Matrix44f proj;
-        proj.set(
-            xScl, 0, 0, -xOff * xScl,
-            0, yScl, 0, -yOff * yScl,
-            0, 0, 0, 1,
-            0, 0, 1, 0);
-        
-        const float PI = 3.14159265358979323846f;
-        Matrix44f r1 = gmtl::makeRot<Matrix44v, AxisAnglef>(AxisAnglef(PI / 2.0f, 0, 0, 1));
-        Matrix44f r2 = gmtl::makeRot<Matrix44v, AxisAnglef>(AxisAnglef(PI, 0, 1, 0));
-        Matrix44f cm = r1 * r2 * proj;
-
-        //std::ostringstream str;
-        //str << proj << std::endl << r1 << std::endl << r2 << std::endl << cm << std::endl;
-        //OutputDebugStringA(str.str().c_str());
-        return cm;
-    }
-
-
     __declspec (dllexport) void BestFitAll(float* _vals0, float* _vals1, int width, int height,
         float *cameraVals,
         Matrix44f *outTransform)
@@ -1137,91 +1107,33 @@ extern "C" {
         float r = ((int)ridx - cnt) * rscale;
         float v = ((int)vidx - cnt) * vscale;
     }
-
-
-    AABoxf g_minmax;
-
-    inline void AAExpand(AABoxf& aabox, const Point3f& v)
-    {
-        for (int i = 0; i < 3; ++i)
-        {
-            if (v[i] < aabox.mMin[i])
-                aabox.mMin[i] = v[i];
-            if (v[i] > aabox.mMax[i])
-                aabox.mMax[i] = v[i];
-        }
-    }
-
-    void AddWorldPointsToTree(const std::vector<Point3f>& pts);
-
-    __declspec (dllexport) void AddWorldPoints(float* vals, int width, int height,
-        float* cameraVals,
-        Matrix44f *transform)
-    {
-        Vec4f cameraCalibrationVals;
-        Vec2f cameraCalibrationDims;
-        memcpy(&cameraCalibrationVals, cameraVals, sizeof(float) * 4);
-        memcpy(&cameraCalibrationDims, cameraVals + 4, sizeof(float) * 2);
-
-        int dw = width;
-        int dh = height;
-
-        int totalFloats = 0;
-        int nLods = 0;
-        while (dw >= 32)
-        {
-            dw /= 2;
-            dh /= 2;
-
-            totalFloats += (dw * dh);
-            nLods++;
-        }
-
-
-        std::vector<vfloat> dlods[8];
-        std::vector<vfloat> depthLods;
-        depthLods.resize(totalFloats);
-        DepthBuildLods(vals, depthLods.data(), width, height);
-
-        dw = width;
-        dh = height;
-
-        vfloat* ptr = depthLods.data();
-        size_t offset = 0;
-        for (int i = 0; i < nLods; ++i)
-        {
-            dw /= 2;
-            dh /= 2;
-
-            dlods[i].resize(dw * dh);
-            memcpy(dlods[i].data(), ptr + offset, dw * dh * sizeof(vfloat));
-            offset += dw * dh;
-        }
-
-        int curLod = 2;
-        dw = width >> curLod;
-        dh = height >> curLod;
-
-        Matrix44f camMatrix =
-            CameraMat(cameraCalibrationVals, cameraCalibrationDims, dw, dh);
-
-        std::vector<Point3f> pts0;
-        float* lodVals = dlods[curLod - 1].data();
-        pts0.resize(dlods[curLod - 1].size());
-        CalcDepthPts(camMatrix, lodVals, dw, dh, pts0.data());
-
-        for (auto itPt = pts0.begin(); itPt != pts0.end(); ++itPt)
-        {
-            gmtl::xform(*itPt, *transform, *itPt);
-            AAExpand(g_minmax, *itPt);
-        }
-
-        AddWorldPointsToTree(pts0);
-        /*
-        std::ostringstream str;
-        str << g_minmax << std::endl;
-        OutputDebugStringA(str.str().c_str());*/
-        AddWorldPointsToTree(pts0);
-    }
 }
 
+Matrix44f CameraMat(const Vec4f& cameraCalibrationVals,
+    const Vec2f& cameraCalibrationDims,
+    int dw, int dh)
+{
+    float ratioX = cameraCalibrationDims[0] / dw;
+    float ratioY = cameraCalibrationDims[1] / dh;
+    Vec4f cMat = cameraCalibrationVals;
+    float xScl = ratioX / cMat[0];
+    float yScl = ratioY / cMat[1];
+    float xOff = cMat[2] / ratioX + (30 * dw / 640);
+    float yOff = cMat[3] / ratioY;
+    Matrix44f proj;
+    proj.set(
+        xScl, 0, 0, -xOff * xScl,
+        0, yScl, 0, -yOff * yScl,
+        0, 0, 0, 1,
+        0, 0, 1, 0);
+
+    const float PI = 3.14159265358979323846f;
+    Matrix44f r1 = gmtl::makeRot<Matrix44v, AxisAnglef>(AxisAnglef(PI / 2.0f, 0, 0, 1));
+    Matrix44f r2 = gmtl::makeRot<Matrix44v, AxisAnglef>(AxisAnglef(PI, 0, 1, 0));
+    Matrix44f cm = r1 * r2 * proj;
+
+    //std::ostringstream str;
+    //str << proj << std::endl << r1 << std::endl << r2 << std::endl << cm << std::endl;
+    //OutputDebugStringA(str.str().c_str());
+    return cm;
+}
