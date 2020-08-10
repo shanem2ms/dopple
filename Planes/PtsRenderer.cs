@@ -185,6 +185,8 @@ namespace Planes
         NrmPt[][] GetNrmPts(int curFrame)
         {
             NrmPt[][] ptArrays = new NrmPt[2][];
+            if (App.Recording.Frames.Count == 0)
+                return null;
             for (int idx = 0; idx < 2; ++idx)
             {
                 VideoFrame vf = App.Recording.Frames[curFrame + (idx * App.Settings.FrameDelta)].vf;
@@ -198,7 +200,6 @@ namespace Planes
 
                 var pts = vf.CalcDepthPoints();
                 NrmPt[] ptArray = new NrmPt[dh * dw];
-                ptArrays[idx] = ptArray;
                 foreach (var p in pts)
                 {
                     ptArray[p.Key] = new NrmPt() { pt = Vector3.TransformPosition(p.Value.pt, mat), spt = p.Value.spt };
@@ -224,6 +225,8 @@ namespace Planes
                     }
                 }
 
+                ptArrays[idx] = ptArray.Where(p => p != null).ToArray();
+
             }
 
             return ptArrays;
@@ -231,13 +234,15 @@ namespace Planes
 
         void UpdateFrame()
         {
+            if (App.Recording.Frames.Count == 0)
+                return;
             int curFrame = App.Recording.CurrentFrameIdx;
             if (curFrame >= App.Recording.Frames.Count - App.Settings.FrameDelta)
                 curFrame = App.Recording.Frames.Count - (App.Settings.FrameDelta + 1);
 
             Matrix4 mat = Matrix4.CreateTranslation(offsetTranslation) *
                 Matrix4.CreateFromQuaternion(
-                    Quaternion.FromEulerAngles(new Vector3(offsetRotation.X, -offsetRotation.Y, offsetRotation.Z)));
+                    Quaternion.FromEulerAngles(new Vector3(offsetRotation.X, offsetRotation.Y, offsetRotation.Z)));
 
             NrmPt[][] ptArrays = GetNrmPts(curFrame);
             for (int idx = 0; idx < 2; ++idx)
@@ -253,28 +258,36 @@ namespace Planes
                         spt = n.spt
                     }).ToArray();
                 }
-                depthVis[idx].UpdateFrame(vf, arr, idx == 0 ? Vector3.UnitX : Vector3.UnitZ);
+                depthVis[idx].UpdateFrame(vf, arr, idx == 0 ? Vector3.Zero : Vector3.UnitZ);
                 
                     }
-            Vector3[] parr0 = ptArrays[0].Select(p => p.pt).ToArray();
-            Vector3[] parr1 = ptArrays[1].Select(p => p.pt).ToArray();
-            Vector3[] pnrm1 = ptArrays[0].Select(p => p.nrm).ToArray();
-            matches = Aligner.FindMatches(parr0, parr1);
-
-            for (int idx = 0; idx < parr1.Length; ++idx)
+            if (ptArrays[0].Length < 40000)
             {
-                parr1[idx] = Vector3.TransformPosition(parr1[idx], mat);
+                Vector3[] parr0 = ptArrays[0].Select(p => p.pt).ToArray();
+                Vector3[] parr1 = ptArrays[1].Select(p => p.pt).ToArray();
+                Vector3[] pnrm1 = ptArrays[0].Select(p => p.nrm).ToArray();
+                matches = Aligner.FindMatches(parr0, parr1);
+
+                for (int idx = 0; idx < parr1.Length; ++idx)
+                {
+                    parr1[idx] = Vector3.TransformPosition(parr1[idx], mat);
+                }
+                RecalcTotalDist(parr0, pnrm1, parr1, matches);
+
+                ptArrays[1] = ptArrays[1].Select(n => new NrmPt()
+                {
+                    pt = Vector3.TransformPosition(n.pt, mat),
+                    nrm = n.nrm,
+                    spt = n.spt
+                }).ToArray();
+
+                matchVis.UpdateFrame(App.Recording.CurrentFrame.vf, ptArrays, matches);
             }
-            RecalcTotalDist(parr0, pnrm1, parr1, matches);
-
-            ptArrays[1] = ptArrays[1].Select(n => new NrmPt()
+            else
             {
-                pt = Vector3.TransformPosition(n.pt, mat),
-                nrm = n.nrm,
-                spt = n.spt
-            }).ToArray();
-
-            matchVis.UpdateFrame(App.Recording.CurrentFrame.vf, ptArrays, matches);
+                matches = new int[0];
+                matchVis.UpdateFrame(App.Recording.CurrentFrame.vf, ptArrays, matches);
+            }
         }
 
         void RecalcTotalDist(Vector3[] parr0, Vector3[] pnrm0, Vector3[] parr1, int[] matches)
@@ -340,14 +353,14 @@ namespace Planes
             };
             Matrix4 outMat;
             Aligner.AlignBest(vf0.depthData, vf1.depthData, camvals,
-                vf0.depthWidth, vf0.depthHeight, out outMat);
+                vf0.depthWidth, vf0.depthHeight, App.Settings.MaxMatchDist, out outMat);
             Quaternion q = outMat.ExtractRotation();
             EulerAngles ea = ToEulerAngles(q);
             outERot = new Vector3((float)ea.pitch, (float)ea.yaw, (float)ea.roll);
             outOffset = outMat.ExtractTranslation();
         }
 
-        void Align1(out Vector3 outOffset, out Vector3 outERot)
+        void AlignLod(out Vector3 outOffset, out Vector3 outERot)
         {
             int curFrame = App.Recording.CurrentFrameIdx;
             if (curFrame >= App.Recording.Frames.Count - App.Settings.FrameDelta)
@@ -357,7 +370,12 @@ namespace Planes
             Vector3[] nrm0 = ptArrays[0].Select(p => p.nrm).ToArray();
             Vector3[] parr1 = ptArrays[1].Select(p => p.pt).ToArray();
             var vf = App.Recording.CurrentFrame.vf;
-            Aligner.Align(parr0, nrm0, parr1, vf.DepthWidth, vf.DepthHeight, out outOffset, out outERot);
+            Matrix4 outMat;
+            Aligner.Align(parr0, nrm0, parr1, vf.DepthWidth, vf.DepthHeight, App.Settings.MaxMatchDist, out outMat);
+            Quaternion q = outMat.ExtractRotation();
+            EulerAngles ea = ToEulerAngles(q);
+            outERot = new Vector3((float)ea.pitch, (float)ea.yaw, (float)ea.roll);
+            outOffset = outMat.ExtractTranslation();
         }
 
         public override void Paint()
@@ -386,10 +404,8 @@ namespace Planes
                 else
                 {
                     matchVis.Render(viewProj, false);
-                    GL.DepthMask(false);
                     depthVis[0].Render(viewProj, true, false);
                     depthVis[1].Render(viewProj, true, false);
-                    GL.DepthMask(true);
                 }
                 this.selVis.Draw(viewProj);
             }
@@ -644,6 +660,11 @@ namespace Planes
                 Align(out offset, out eRot);
                 offsetTranslation = offset;
                 offsetRotation = eRot;
+
+                Matrix4 amat1 = Matrix4.CreateTranslation(offsetTranslation) *
+                    Matrix4.CreateFromQuaternion(
+                    Quaternion.FromEulerAngles(new Vector3(offsetRotation.X, offsetRotation.Y, offsetRotation.Z)));
+
             }
             else if (param == 1)
             {
@@ -655,10 +676,22 @@ namespace Planes
             {
                 Matrix4 amat = Matrix4.CreateTranslation(offsetTranslation) *
                     Matrix4.CreateFromQuaternion(
-                    Quaternion.FromEulerAngles(new Vector3(offsetRotation.X, -offsetRotation.Y, offsetRotation.Z)));
-                this.alignMat *= amat;
+                    Quaternion.FromEulerAngles(new Vector3(offsetRotation.X, offsetRotation.Y, offsetRotation.Z)));
+                this.alignMat = amat;
                 offsetTranslation = Vector3.Zero;
                 offsetRotation = Vector3.Zero;
+            }
+            else if (param == 3)
+            {
+                Vector3 offset;
+                Vector3 eRot;
+                AlignLod(out offset, out eRot);
+                offsetTranslation = offset;
+                offsetRotation = eRot;
+
+                Matrix4 amat1 = Matrix4.CreateTranslation(offsetTranslation) *
+                    Matrix4.CreateFromQuaternion(
+                    Quaternion.FromEulerAngles(new Vector3(offsetRotation.X, offsetRotation.Y, offsetRotation.Z)));
             }
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("OffsetTranslationX"));
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("OffsetTranslationY"));
@@ -667,6 +700,13 @@ namespace Planes
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("OffsetRotationY"));
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("OffsetRotationZ"));
             isDirty = true;
+        }
+        public override void KeyDown(wf.KeyEventArgs e)
+        {
+        }
+
+        public override void KeyUp(wf.KeyEventArgs e)
+        {
         }
     }
 }

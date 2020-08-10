@@ -133,5 +133,12 @@ namespace Planes
         }
 
         public override void Action(int param) { }
+        public override void KeyDown(wf.KeyEventArgs e)
+        {
+        }
+
+        public override void KeyUp(wf.KeyEventArgs e)
+        {
+        }
     }
 }

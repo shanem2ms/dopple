@@ -80,6 +80,9 @@ namespace Dopple
 
         public Frame CurrentFrame => Frames[this.curFrameIdx];
 
+        public int StartFrame { get; set; } = 0;
+        public int EndFrame { get; set; } = 0;
+
         public List<Frame> Frames
         {
             get
@@ -184,8 +187,9 @@ namespace Dopple
             this.OnFrameProcessed += Recording_OnFrameProcessed;
             recavg /= avgweight;
 
-            this.curFrameIdx = 0;
+            EndFrame = NumFrames - 1;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("NumFrames"));
+            this.curFrameIdx = 0;
         }
 
         public void BuildMeshes(Settings settings)

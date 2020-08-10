@@ -10,10 +10,6 @@
 #include <gmtl/AABox.h>
 using namespace gmtl;
 
-typedef unsigned int uint32;
-typedef unsigned int uint64;
-typedef unsigned char uchar;
-
 class OctTreeLoc
 {
 public:

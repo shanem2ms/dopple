@@ -4,7 +4,6 @@ using OpenTK;
 using GLObjects;
 using wf = System.Windows.Forms;
 using System.Windows.Input;
-using System.Windows.Forms;
 using System.Linq;
 using Dopple;
 using System.ComponentModel;
@@ -13,6 +12,8 @@ using System.Threading;
 using System.Windows.Documents;
 using OpenCvSharp;
 using System.Diagnostics;
+using System.Windows.Controls.Primitives;
+using System.Runtime.InteropServices;
 
 namespace Planes
 {
@@ -37,6 +38,7 @@ namespace Planes
         CameraTrackVis camTrackVis;
         Selection selVis;
         RenderTarget pickTarget;
+        GridVis gridVis;
 
         float yRot = 0;
         float yRotDn;
@@ -54,7 +56,8 @@ namespace Planes
         int[] matches;
         Vector3 offsetTranslation = Vector3.Zero;
         Vector3 offsetTranslationMsDn = Vector3.Zero;
-        Vector3[] worldPts = null;
+        WorldPt[] worldPts = null;        
+
         float multiplier = 0.01f;
         public float OffsetTranslationX
         {
@@ -116,6 +119,9 @@ namespace Planes
             isDirty = true;
         }
 
+        Vector3 moveVec = Vector3.Zero;
+        float speed = 0.05f;
+
         public Matrix4 viewMat
         {
             get
@@ -131,6 +137,7 @@ namespace Planes
         {
             sceneVis = new SceneVis();
             worldVis = new WorldVis();
+            gridVis = new GridVis();
             camTrackVis = new CameraTrackVis();
             for (int i = 0; i < 2; ++i)
             {
@@ -199,7 +206,8 @@ namespace Planes
             return ptArray;
         }
 
-        Matrix4 []frameMatrix = null;
+        Matrix4[] frameMatrix = null;
+        Matrix4d[] deltaMatrix = null;
         int nFramesProcessed = 0;
         int nFramesShown = 0;
         bool framesReady = false;
@@ -225,57 +233,125 @@ namespace Planes
             return new Matrix4d(ToD(m.Row0), ToD(m.Row1), ToD(m.Row2), ToD(m.Row3));
         }
 
-        void StartBkProcess()
+        void StartBkWorldPts()
         {
             frameMatrix = new Matrix4[App.Recording.NumFrames];
-            Thread t = new Thread(() =>
+            Matrix4d totalMatrix = Matrix4d.Identity;
+            frameMatrix[0] = Matrix4.Identity;
+            for (int idx = 0; idx < deltaMatrix.Length - 1; ++idx)
             {
-                int startFrame = 0;
-                int endFrame = App.Recording.NumFrames - 1;
-                Matrix4d totalMatrix = Matrix4d.Identity;
+                totalMatrix = deltaMatrix[idx] * totalMatrix;
+                frameMatrix[idx + 1] = FromD(totalMatrix);
+            }
 
-                frameMatrix[0] = FromD(totalMatrix);
-                var vfcam = App.Recording.Frames[0].vf;
-                float[] camvals = new float[6]
-                {
+            nFramesProcessed = App.Recording.NumFrames;
+            framesReady = true;
+            isDirty = true;
+
+
+            int startFrame = App.Recording.StartFrame;
+            int endFrame = App.Recording.EndFrame;
+            var vfcam = App.Recording.Frames[0].vf;
+            float[] camvals = new float[6]
+            {
                     vfcam.cameraCalibrationVals.X,
                     vfcam.cameraCalibrationVals.Y,
                     vfcam.cameraCalibrationVals.Z,
                     vfcam.cameraCalibrationVals.W,
                     vfcam.cameraCalibrationDims.X,
                     vfcam.cameraCalibrationDims.Y
-                };
+            };
 
-                int dw = App.Recording.Frames[0].vf.DepthWidth;
-                int dh = App.Recording.Frames[0].vf.depthHeight;
-                for (int curFrame = startFrame; curFrame < endFrame; ++curFrame)
+            int nextFrame = startFrame - 1;
+            Thread[] threads = new Thread[28];
+            for (int idx = 0; idx < threads.Length; ++idx)
+            {
+                threads[idx] = new Thread(() =>
                 {
-                    Matrix4 outMat;
-                    var vf0 = App.Recording.Frames[curFrame].vf;
-                    var vf1 = App.Recording.Frames[curFrame + 1].vf;
-                    Aligner.AlignBest(vf0.depthData, vf1.depthData, camvals,
-                        vf0.depthWidth, vf0.depthHeight, out outMat);
-
-                    totalMatrix = ToD(outMat) * totalMatrix;
-
-                    Aligner.AddWorldPoints(vf1.depthData, camvals, vf1.depthWidth, vf1.depthHeight, 
-                        FromD(totalMatrix));
-                    frameMatrix[curFrame + 1] = FromD(totalMatrix);
-                    nFramesProcessed = curFrame + 2;
-                    isDirty = true;
-                    if ((curFrame % 10) == 0)
+                    while (true)
                     {
-                        worldPts = Aligner.GetWorldPoints();
-                    }
-                }
+                        int curFrame = Interlocked.Increment(ref nextFrame);
 
-                framesReady = true;
-            });
-            t.Start();
+                        if (curFrame == endFrame)
+                        {
+                            Aligner.GetWorldPoints(out worldPts, 0, endFrame + 1);
+                            Trace.WriteLine($"Num WorldPts {worldPts.Length}");
+                            isDirty = true;
+                        }
+                        if (curFrame >= endFrame)
+                            break;
+
+                        var vf = App.Recording.Frames[curFrame].vf;
+                        Aligner.AddWorldPoints(vf.depthData, vf.depthWidth, vf.depthHeight,
+                            vf.imageData, vf.imageWidth, vf.imageHeight,
+                            camvals,
+                            frameMatrix[curFrame],
+                            curFrame);
+                    }
+                });
+
+                threads[idx].Start();
+            }
+
+        }
+
+        void StartBkAlign()
+        {
+            int nextFrame = -1;
+            var vfcam = App.Recording.Frames[0].vf;
+            float[] camvals = new float[6]
+            {
+                    vfcam.cameraCalibrationVals.X,
+                    vfcam.cameraCalibrationVals.Y,
+                    vfcam.cameraCalibrationVals.Z,
+                    vfcam.cameraCalibrationVals.W,
+                    vfcam.cameraCalibrationDims.X,
+                    vfcam.cameraCalibrationDims.Y
+            };
+
+            int dw = App.Recording.Frames[0].vf.DepthWidth;
+            int dh = App.Recording.Frames[0].vf.depthHeight;
+            deltaMatrix = new Matrix4d[App.Recording.NumFrames];
+
+            int endFrame = App.Recording.NumFrames - 1;
+            Thread[] threads = new Thread[28];
+            for (int idx = 0; idx < threads.Length; ++idx)
+            {
+                threads[idx] = new Thread(() =>
+                {
+                    while (true)
+                    {
+                        int curFrame = Interlocked.Increment(ref nextFrame);
+
+                        if (curFrame == endFrame)
+                            StartBkWorldPts();
+                        if (curFrame >= endFrame)
+                            break;
+                        Matrix4 outMat;
+                        var vf0 = App.Recording.Frames[curFrame].vf;
+                        var vf1 = App.Recording.Frames[curFrame + 1].vf;
+                        bool success = Aligner.AlignBest(vf0.depthData, vf1.depthData, camvals,
+                            vf0.depthWidth, vf0.depthHeight, App.Settings.MaxMatchDist, out outMat);
+                        if (!success)
+                            Trace.WriteLine($"Align filaure frame {curFrame}");
+
+                        deltaMatrix[curFrame] = ToD(outMat);
+                    }
+                });
+
+                threads[idx].Start();
+            }
         }
 
         void UpdateFrame()
         {
+            if (frameMatrix == null)
+                return;
+
+            nFramesShown = nFramesProcessed;
+            var vfcam = App.Recording.Frames[0].vf;
+            this.camTrackVis.UpdateFrame(vfcam, frameMatrix, App.Recording.CurrentFrameIdx, nFramesShown);
+
             if (framePts == null)
                 framePts = new NrmPt[App.Recording.NumFrames][];
             for (int idx = 0; idx <= App.Recording.CurrentFrameIdx; ++idx)
@@ -283,7 +359,6 @@ namespace Planes
                 if (framePts[idx] == null)
                     framePts[idx] = GetNrmPts(idx);
             }
-            var vfcam = App.Recording.Frames[0].vf;
 
             var framePtsList = frameMatrix.Zip(framePts, (x, y) => new Tuple<Matrix4, NrmPt[]>(x, y)).ToList().GetRange(0,
                 App.Recording.CurrentFrameIdx + 1);
@@ -292,8 +367,6 @@ namespace Planes
             {
                 this.worldVis.UpdateFrame(this.worldPts);
             }
-            nFramesShown = nFramesProcessed;
-            this.camTrackVis.UpdateFrame(vfcam, frameMatrix, App.Recording.CurrentFrameIdx, nFramesShown);
             isDirty = false;
         }
 
@@ -314,9 +387,11 @@ namespace Planes
 
         public override void Paint()
         {
-            if (frameMatrix == null)
+            this.curPos += Vector3.TransformVector(moveVec, this.rotMatrix);
+
+            if (deltaMatrix == null)
             {
-                StartBkProcess();
+                StartBkAlign();
             }
             if (isDirty)
             {
@@ -339,6 +414,7 @@ namespace Planes
                 GL.Clear(ClearBufferMask.DepthBufferBit);
                 GL.Enable(EnableCap.Blend);
                 GL.Enable(EnableCap.DepthTest);
+                gridVis.Render(viewProj);
                 if (i == 0)
                     worldVis.Render(viewProj, false, false);
                 else
@@ -383,9 +459,14 @@ namespace Planes
 
                     float sx = ((float)px / (float)currentWidth * 2) - 1;
                     float sy = 1 - ((float)y / (float)currentHeight * 2);
-                    Matrix4 vpinv = this.viewMat * this.projectionMat;
-                    vpinv.Invert();
                     selVis.wPos = new Vector3(wsPos.r, wsPos.g, wsPos.b);
+                    if (selVis.wPos.Length == 0)
+                    {
+                        Matrix4 vpinv = this.viewMat * this.projectionMat;
+                        vpinv.Invert();
+                        selVis.wPos = Vector3.TransformPerspective(new Vector3(0, 0, 0.5f),
+                            vpinv);
+                    }
                     this.worldPivot = selVis.wPos;
                     this.mouseDownPivot = this.worldPivot;
                     this.spivot = Vector3.TransformPerspective(worldPivot, this.viewMat * this.projectionMat);
@@ -409,7 +490,7 @@ namespace Planes
         }
 
 
-        public override void MouseMove(int x, int y, MouseButtons button)
+        public override void MouseMove(int x, int y, wf.MouseButtons button)
         {
             Vector2 curPt = new Vector2(x, y);
             if (mouseDownPt != null)
@@ -589,6 +670,49 @@ namespace Planes
 
         public override void Action(int param)
         {
+            if (param == 0)
+            {
+                StartBkAlign();
+            }
+        }
+
+        [DllImport("user32.dll")]
+        static extern short GetKeyState(int key);
+
+        public static bool IsKeyPressed(wf.Keys key)
+        {
+            short state = GetKeyState((int)key);
+            return ((state & 128) != 0);
+        }
+        void UpdateVec()
+        {
+            this.moveVec = Vector3.Zero;
+            if (IsKeyPressed(wf.Keys.W))
+                moveVec.Z -= speed;
+            if (IsKeyPressed(wf.Keys.S))
+                moveVec.Z += speed;
+            if (IsKeyPressed(wf.Keys.A))
+                moveVec.X += speed;
+            if (IsKeyPressed(wf.Keys.D))
+                moveVec.X -= speed;
+            if (IsKeyPressed(wf.Keys.LShiftKey))
+                moveVec.Y -= speed;
+            if (IsKeyPressed(wf.Keys.Space))
+                moveVec.Y += speed;
+        }
+
+        public override void KeyDown(wf.KeyEventArgs e)
+        {
+            UpdateVec();
+            this.camTrackVis.KeyDown(e);
+            e.Handled = true;
+        }
+
+        public override void KeyUp(wf.KeyEventArgs e)
+        {
+            UpdateVec();
+            this.camTrackVis.KeyUp(e);
+            e.Handled = true;
         }
     }
 }

@@ -48,8 +48,9 @@ namespace Planes
         float minDPVal = 0.9f;
         float maxCoverage = 10.0f;
         int blur = 2;
-        int depthLod = 2;
-        int frameDelta = 5;
+        int depthLod = 3;
+        int frameDelta = 1;
+        float maxMatchDist = 0.2f;
 
         public event EventHandler<EventArgs> OnSettingsChanged;
 
@@ -60,6 +61,7 @@ namespace Planes
         public int Blur { get => blur; set { blur = value; Refresh(); } }
         public int DepthLod { get => depthLod; set { depthLod = value; Refresh(); } }
         public int FrameDelta { get => frameDelta; set { frameDelta = value; Refresh(); } }
+        public float MaxMatchDist { get => maxMatchDist; set { maxMatchDist = value; Refresh(); } }
 
         void Refresh()
         {

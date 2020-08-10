@@ -70,7 +70,7 @@ namespace Dopple
         public static extern void ImageBlur(IntPtr pImageBuffer, IntPtr pOutEdges, int imageWidth, int iamgeHeight, int blur);        
 
         [DllImport("ptslib.dll")]
-        public static extern void DepthBuildLods(IntPtr pDepthBuffer, IntPtr outpts, int depthWidth, int depthHeight);
+        public static extern void DepthBuildLods(IntPtr pDepthBuffer, IntPtr outpts, int depthWidth, int depthHeight, float maxdist);
 
         [DllImport("ptslib.dll")]
         public static extern void DepthFindNormals(IntPtr pDepthPts, IntPtr pOutNormals, int ptx, int pty, int depthWidth, int depthHeight);
@@ -183,21 +183,23 @@ namespace Dopple
                 {
                     float depthVal = depthVals[y * depthWidth + x];
                     if (!float.IsNaN(depthVal))
+                    {
                         lastGoodDepth = depthVal;
-                    else
-                        depthVal = lastGoodDepth;
+                        //else
+                        //depthVal = lastGoodDepth;
 
-                    float z = 1 / depthVal;
-                    Vector4 modelPos = Vector4.Transform(cm, new Vector4(x, y, z, 1));
-                    modelPos /= modelPos.W;
-                    pos.Add(y * depthWidth + x, new V3Pt(new Vector3(modelPos.X, modelPos.Y, modelPos.Z),
-                        new Vector2((float)x / (float)(depthWidth - 1), (float)y / (float)(depthHeight - 1))));
-                    minv.X = Math.Min(modelPos.X, minv.X);
-                    minv.Y = Math.Min(modelPos.Y, minv.Y);
-                    minv.Z = Math.Min(modelPos.Z, minv.Z);
-                    maxv.X = Math.Max(modelPos.X, maxv.X);
-                    maxv.Y = Math.Max(modelPos.Y, maxv.Y);
-                    maxv.Z = Math.Max(modelPos.Z, maxv.Z);
+                        float z = 1 / depthVal;
+                        Vector4 modelPos = Vector4.Transform(cm, new Vector4(x, y, z, 1));
+                        modelPos /= modelPos.W;
+                        pos.Add(y * depthWidth + x, new V3Pt(new Vector3(modelPos.X, modelPos.Y, modelPos.Z),
+                            new Vector2((float)x / (float)(depthWidth - 1), (float)y / (float)(depthHeight - 1))));
+                        minv.X = Math.Min(modelPos.X, minv.X);
+                        minv.Y = Math.Min(modelPos.Y, minv.Y);
+                        minv.Z = Math.Min(modelPos.Z, minv.Z);
+                        maxv.X = Math.Max(modelPos.X, maxv.X);
+                        maxv.Y = Math.Max(modelPos.Y, maxv.Y);
+                        maxv.Z = Math.Max(modelPos.Z, maxv.Z);
+                    }
                 }
             }
             return pos;
@@ -241,7 +243,7 @@ namespace Dopple
             IntPtr depthPtr = Marshal.AllocHGlobal(width * height * 4);
             IntPtr depthOut = Marshal.AllocHGlobal(totalFloats * 4);
             Marshal.Copy(depthVals, 0, depthPtr, depthVals.Length);
-            DepthBuildLods(depthPtr, depthOut, width, height);
+            DepthBuildLods(depthPtr, depthOut, width, height, 100);
 
             float[] alllods = new float[totalFloats];
             Marshal.Copy(depthOut, alllods, 0, totalFloats);

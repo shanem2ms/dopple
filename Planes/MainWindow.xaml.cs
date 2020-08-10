@@ -3,6 +3,7 @@ using System.Windows;
 using OpenTK.Graphics.ES30;
 using OpenTK;
 using GLObjects;
+using System.Windows.Markup;
 using wf = System.Windows.Forms;
 using System.Windows.Input;
 using System.Diagnostics;
@@ -23,13 +24,36 @@ namespace Planes
         public abstract void MouseDn(int x, int y, wf.MouseButtons button);
         public abstract void MouseMove(int x, int y, wf.MouseButtons button);
         public abstract void MouseWheel(int x, int y, int delta);
+        public abstract void KeyDown(wf.KeyEventArgs e);
+        public abstract void KeyUp(wf.KeyEventArgs e);
         public abstract void Action(int param);
+
     }
+
+    public enum Modes
+    {
+        Video,
+        Depth,
+        Points,
+        Planes,
+        Motion,
+        Scene
+    };
+
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
     public partial class MainWindow : Window
     {
+        public Modes Mode
+        {
+            get => mode; set
+            {
+                this.mode = value; RefreshMode();
+            }
+        }
+        Modes mode = Modes.Scene;
+
         public Dopple.Recording ActiveRecording => App.Recording;
         IRenderer[] renderers = new IRenderer[] {
                 new VideoRenderer(),
@@ -42,7 +66,7 @@ namespace Planes
 
         public Settings Settings => App.Settings;
 
-        public IRenderer AR => renderers[5];
+        public IRenderer AR => renderers[(int)Mode];
 
         public MainWindow()
         {
@@ -50,6 +74,11 @@ namespace Planes
             InitializeComponent();
             foreach (var r in renderers)
                 r.Invalidate = OnInvalidate;
+        }
+
+        void RefreshMode()
+        {
+
         }
 
         void OnInvalidate()
@@ -80,6 +109,8 @@ namespace Planes
             glControl.MouseMove += GlControl_MouseMove;
             glControl.MouseUp += GlControl_MouseUp;
             glControl.MouseWheel += GlControl_MouseWheel;
+            glControl.KeyDown += GlControl_KeyDown;
+            glControl.KeyUp += GlControl_KeyUp;
             renderTimer.Interval = 1.0f / 60.0f;
             renderTimer.Elapsed += RenderTimer_Elapsed;
 
@@ -91,6 +122,16 @@ namespace Planes
             renderTimer.Start();
 
             ActiveRecording.OnDownloadProgress += ActiveRecording_OnDownloadProgress;
+        }
+
+        private void GlControl_KeyUp(object sender, wf.KeyEventArgs e)
+        {
+            AR.KeyUp(e);
+        }
+
+        private void GlControl_KeyDown(object sender, wf.KeyEventArgs e)
+        {
+            AR.KeyDown(e);
         }
 
         private void ActiveRecording_OnDownloadProgress(object sender, double e)
@@ -156,6 +197,57 @@ namespace Planes
         private void Button_Click_2(object sender, RoutedEventArgs e)
         {
             AR.Action(2);
+        }
+
+        private void Button_Click_3(object sender, RoutedEventArgs e)
+        {
+            AR.Action(3);
+        }        
+    }
+
+    public class EnumBindingSourceExtension : MarkupExtension
+    {
+        private Type _enumType;
+        public Type EnumType
+        {
+            get { return this._enumType; }
+            set
+            {
+                if (value != this._enumType)
+                {
+                    if (null != value)
+                    {
+                        Type enumType = Nullable.GetUnderlyingType(value) ?? value;
+                        if (!enumType.IsEnum)
+                            throw new ArgumentException("Type must be for an Enum.");
+                    }
+
+                    this._enumType = value;
+                }
+            }
+        }
+
+        public EnumBindingSourceExtension() { }
+
+        public EnumBindingSourceExtension(Type enumType)
+        {
+            this.EnumType = enumType;
+        }
+
+        public override object ProvideValue(IServiceProvider serviceProvider)
+        {
+            if (null == this._enumType)
+                throw new InvalidOperationException("The EnumType must be specified.");
+
+            Type actualEnumType = Nullable.GetUnderlyingType(this._enumType) ?? this._enumType;
+            Array enumValues = Enum.GetValues(actualEnumType);
+
+            if (actualEnumType == this._enumType)
+                return enumValues;
+
+            Array tempArray = Array.CreateInstance(actualEnumType, enumValues.Length + 1);
+            enumValues.CopyTo(tempArray, 1);
+            return tempArray;
         }
     }
 }

@@ -24,9 +24,6 @@
     <ClInclude Include="Pt.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="OctGrid.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="OctTreeLoc.h">
       <Filter>Source Files</Filter>
     </ClInclude>
@@ -57,9 +54,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="World.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="OctGrid.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="OctTreeLoc.cpp">

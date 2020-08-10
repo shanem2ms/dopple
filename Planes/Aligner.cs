@@ -22,26 +22,27 @@ namespace Planes
         public static extern void FreePtCloudAlign(IntPtr aligner);
 
         [DllImport("ptslib.dll")]
-        public static extern void BestFit(IntPtr pts0, uint ptCount0, IntPtr pts1, uint ptCount1, int dw, int dh, IntPtr outTranslate,
-            IntPtr outRotate);
+        public static extern void BestFit(IntPtr pts0, IntPtr nrm0, uint ptCount0, IntPtr pts1, uint ptCount1, int dw, int dh, float maxDistThreshold, IntPtr outTransform);
 
         [DllImport("ptslib.dll")]
-        public static extern void BestFitAll(IntPtr pts0, IntPtr pts1, int dw, int dh, IntPtr camMatrix, IntPtr outAlignTransform);
+        public static extern bool BestFitAll(IntPtr pts0, IntPtr pts1, int dw, int dh, IntPtr camMatrix, float maxDistThreshold, IntPtr outAlignTransform);
 
         [DllImport("ptslib.dll")]
-        public static extern void AddWorldPoints(IntPtr pts, int dw, int dh, IntPtr camMatrix, IntPtr transform);
+        public static extern void AddWorldPoints(IntPtr pts, int dw, int dh,
+            IntPtr yuv, int vw, int vh, IntPtr camMatrix, IntPtr transform,
+            int curFrame);
 
         [DllImport("ptslib.dll")]
-        public static extern int GetWorldNumPts();
+        public static extern int GetWorldNumPts(int frameStart, int frameCount);
 
         [DllImport("ptslib.dll")]
-        public static extern int GetWorldPoints(IntPtr outpts);
+        public static extern int GetWorldPoints(IntPtr outpts, int frameStart, int frameCount);
 
         [DllImport("ptslib.dll")]
         public static extern void CalcScores();
 
         [DllImport("ptslib.dll")]
-        public static extern int FindMatches(IntPtr m_pts0, uint ptCount0, IntPtr m_pts1, uint ptCount1, IntPtr matches);
+        public static extern int FindMatches(IntPtr m_pts0, uint ptCount0, IntPtr m_pts1, uint ptCount1, float maxDistThreshold, IntPtr matches);
 
 
         public static IntPtr AllocVec3Array(Vector3[] pos)
@@ -76,6 +77,19 @@ namespace Planes
             }
         }
 
+        public static void CopyToWorldPtArray(IntPtr mpts0, WorldPt[] wpts)
+        {
+            int wptSize = Marshal.SizeOf(typeof(WorldPt));
+
+            IntPtr ptr = mpts0;
+            for (int idx = 0; idx < wpts.Length; ++idx)
+            {
+                wpts[idx] = (WorldPt)Marshal.PtrToStructure(ptr, typeof(WorldPt));
+                ptr = new IntPtr(ptr.ToInt64() + wptSize);
+            }
+        }
+        
+
         public static Matrix4 MatrixDToF(Matrix4d m)
         {
             return new Matrix4(Vector4DtoF(m.Row0),
@@ -90,6 +104,22 @@ namespace Planes
         }
     }
 
+    public struct RGBt
+    {
+        public byte R;
+        public byte G;
+        public byte B;
+    };
+
+    public struct WorldPt
+    {
+        public Vector3 pt;
+        public Vector3 nrm;
+        public float size;
+        public RGBt color;
+    };
+
+
     public class Aligner
     {
         public static int [] FindMatches(Vector3 []pts0, Vector3[]pts1)
@@ -97,7 +127,7 @@ namespace Planes
             IntPtr mpts0 = DPEngine.AllocVec3Array(pts0);
             IntPtr mpts1 = DPEngine.AllocVec3Array(pts1);
             IntPtr matches = Marshal.AllocHGlobal(sizeof(int) * pts0.Length * 2);
-            int nmatches = DPEngine.FindMatches(mpts0, (uint)pts0.Length, mpts1, (uint)pts1.Length, matches);
+            int nmatches = DPEngine.FindMatches(mpts0, (uint)pts0.Length, mpts1, (uint)pts1.Length, App.Settings.MaxMatchDist, matches);
             
             int[] matchArray = new int[nmatches * 2];
             Marshal.Copy(matches, matchArray, 0, matchArray.Length);
@@ -109,28 +139,26 @@ namespace Planes
         }
 
         public static void Align(Vector3[] pts0, Vector3[] nrm0, Vector3[] pts1,
-            int dw, int dh,
-            out Vector3 offset,
-            out Vector3 eRot)
+            int dw, int dh, float maxDistThreshold,
+            out Matrix4 alignTransform)
         {
             IntPtr mpts0 = DPEngine.AllocVec3Array(pts0);
             IntPtr mpts1 = DPEngine.AllocVec3Array(pts1);
+            IntPtr nrmp0 = DPEngine.AllocVec3Array(nrm0);
 
-
-            IntPtr translatePtr = Marshal.AllocHGlobal(sizeof(float) * 3);
-            IntPtr rotatePtr = Marshal.AllocHGlobal(sizeof(float) * 3);
-            DPEngine.BestFit(mpts0, (uint)pts0.Length, mpts1, (uint)pts1.Length, dw, dh, translatePtr, rotatePtr);
+            IntPtr transformPtr = Marshal.AllocHGlobal(sizeof(float) * 16);
+            DPEngine.BestFit(mpts0, nrmp0, (uint)pts0.Length, mpts1, (uint)pts1.Length, dw, dh, maxDistThreshold, transformPtr);
             Marshal.FreeHGlobal(mpts0);
             Marshal.FreeHGlobal(mpts1);
-            offset = (Vector3)Marshal.PtrToStructure(translatePtr, typeof(Vector3));
-            eRot = (Vector3)Marshal.PtrToStructure(rotatePtr, typeof(Vector3));
-            Marshal.FreeHGlobal(translatePtr);
-            Marshal.FreeHGlobal(rotatePtr);
+            Marshal.FreeHGlobal(nrmp0);
+            alignTransform = (Matrix4)Marshal.PtrToStructure(transformPtr, typeof(Matrix4));
+            Marshal.FreeHGlobal(transformPtr);
         }
 
-        public static void AlignBest(byte []depthData0, byte[] depthData1,
+        public static bool AlignBest(byte []depthData0, byte[] depthData1,
             float []cameraVals,
             int dw, int dh,
+            float maxDistThreshold,
             out Matrix4 alignTransform)
         {
             IntPtr mpts0 = Marshal.AllocHGlobal(depthData0.Length);
@@ -141,38 +169,46 @@ namespace Planes
             Marshal.Copy(cameraVals, 0, camPtr, cameraVals.Length);
 
             IntPtr transformPtr = Marshal.AllocHGlobal(sizeof(float) * 16);
-            DPEngine.BestFitAll(mpts0, mpts1, dw, dh, camPtr, transformPtr);
+            bool success = DPEngine.BestFitAll(mpts0, mpts1, dw, dh, camPtr, maxDistThreshold, transformPtr);
             Marshal.FreeHGlobal(mpts0);
             Marshal.FreeHGlobal(mpts1);
             Marshal.FreeHGlobal(camPtr);
             alignTransform = (Matrix4)Marshal.PtrToStructure(transformPtr, typeof(Matrix4));
             Marshal.FreeHGlobal(transformPtr);
+            return success;
         }
 
-        public static Vector3 []GetWorldPoints()
+        public static void GetWorldPoints(out WorldPt[] outPts, int startFrame, int frameCount)
         {
-            int numPts = DPEngine.GetWorldNumPts();
-            IntPtr ptsPtr = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(Vector3)) * numPts);
-            DPEngine.GetWorldPoints(ptsPtr);
-            Vector3[] outPts = new Vector3[numPts];
-            DPEngine.CopyToVec3Array(ptsPtr, outPts);
+            int numPts = DPEngine.GetWorldNumPts(startFrame, frameCount);
+            IntPtr ptsPtr = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(WorldPt)) * numPts);
+            DPEngine.GetWorldPoints(ptsPtr, startFrame, frameCount);
+            outPts = new WorldPt[numPts];
+            DPEngine.CopyToWorldPtArray(ptsPtr, outPts);
             Marshal.FreeHGlobal(ptsPtr);
-            return outPts;
         }
 
         public static void AddWorldPoints(byte[] depthData,
-            float[] cameraVals,
             int dw, int dh,
-            Matrix4 transform)
+            byte []yuv,
+            int vw, int vh,
+            float[] cameraVals,
+            Matrix4 transform,
+            int curFrame)
         {
             IntPtr mpts0 = Marshal.AllocHGlobal(depthData.Length);
             Marshal.Copy(depthData, 0, mpts0, depthData.Length);
+            IntPtr yuvPtr = Marshal.AllocHGlobal(yuv.Length);
+            Marshal.Copy(yuv, 0, yuvPtr, yuv.Length);
+
             IntPtr camPtr = Marshal.AllocHGlobal(sizeof(float) * cameraVals.Length);
             Marshal.Copy(cameraVals, 0, camPtr, cameraVals.Length);
             IntPtr transformPtr = Marshal.AllocHGlobal(sizeof(float) * 16);
             Marshal.StructureToPtr(transform, transformPtr, false);
 
-            DPEngine.AddWorldPoints(mpts0, dw, dh, camPtr, transformPtr);
+            DPEngine.AddWorldPoints(mpts0, dw, dh, yuvPtr, 
+                vw, vh, camPtr, transformPtr, curFrame);
+            Marshal.FreeHGlobal(yuvPtr);
             Marshal.FreeHGlobal(mpts0);
             Marshal.FreeHGlobal(camPtr);
             Marshal.FreeHGlobal(transformPtr);

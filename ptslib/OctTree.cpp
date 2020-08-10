@@ -98,7 +98,7 @@ template <typename ValueType, int M, int ML> void OctNode<ValueType, M, ML>::Con
 	children = m_children;
 	m_csNode.unlock();
 
-	if (children.size() == 0 && m_pts.size() > 0)
+	if (children.size() == 0 && m_pts.size() > 1)
 	{
 		m_csNode.lock();
 		std::sort(m_pts.begin(), m_pts.end(), [](const std::pair<OctTreeLoc, PointType>& lhs, const std::pair<OctTreeLoc, PointType>& rhs)
@@ -126,5 +126,6 @@ template <typename ValueType, int M, int ML> void OctNode<ValueType, M, ML>::Con
 // Instantiations
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template class OctTree<Point3f, 64, 9>;
+
+template SceneTree;
 

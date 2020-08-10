@@ -42,25 +42,33 @@ namespace Planes
             return new Vector3(1, 1, 1);
         }
 
-        public void UpdateFrame(Vector3 []worldPts)
+        bool isBuilt = false;
+        public void UpdateFrame(WorldPt []worldPts)
         {
-            float qscl = 1;
-            List<Vector3> pos = new List<Vector3>();
-            List<Vector3> nrm = new List<Vector3>();
-            List<Vector3> tex = new List<Vector3>();
-            List<uint> ind = new List<uint>();
-            foreach (var p in worldPts)
+            if (!isBuilt)
             {
-                if (p == null)
-                    continue;
+                List<Vector3> pos = new List<Vector3>();
+                List<Vector3> nrm = new List<Vector3>();
+                List<Vector3> tex = new List<Vector3>();
+                List<uint> ind = new List<uint>();
 
-                if (float.IsInfinity(p.X))
-                    continue;
+                float mul = 1.0f / 255.0f;
+                for (int idx = 0; idx < worldPts.Length; ++idx)
+                {
+                    var p = worldPts[idx];
+                    if (float.IsInfinity(p.pt.X))
+                        continue;
+                    Vector3 color = new Vector3(p.color.R * mul,
+                        p.color.G * mul,
+                        p.color.B * mul);
 
-                AddCube(pos, tex, nrm, ind, 0.01f, p);
+
+                    AddCube(pos, tex, nrm, ind, p.size, p.pt, color);
+                }
+                genVertexArray =
+                    new VertexArray(this._Program, pos.ToArray(), ind.ToArray(), tex.ToArray(), nrm.ToArray());
+                isBuilt = true;
             }
-            genVertexArray = 
-                new VertexArray(this._Program, pos.ToArray(), ind.ToArray(), tex.ToArray(), nrm.ToArray());
         }
 
 
@@ -166,7 +174,7 @@ namespace Planes
             new Vector3(1.0f, -1.0f, 1.0f),  // 5
         };
 
-        static void AddCube(List<Vector3> pos, List<Vector3> texs, List<Vector3> nrms, List<uint> indices, float scale, Vector3 offset)
+        static void AddCube(List<Vector3> pos, List<Vector3> texs, List<Vector3> nrms, List<uint> indices, float scale, Vector3 offset, Vector3 color)
         {
             Vector3[] normals = new Vector3[3]
             {
@@ -210,12 +218,8 @@ namespace Planes
             Vector3[] texCoords = new Vector3[c2.Length];
             for (int i = 0; i < c2.Length; ++i)
             {
+                texCoords[i] = color;
                 indices.Add((uint)(i + iOffset));
-                Vector3 xdir = xdirs[i / 12];
-                Vector3 ydir = ydirs[i / 12];
-                int sideIdx = i / 6;
-                texCoords[i] = new Vector3(Vector3.Dot(c2[i], xdir),
-                    Vector3.Dot(c2[i], ydir), (float)sideIdx / 6.0f);
             }
             texs.AddRange(texCoords);
         }

@@ -136,7 +136,7 @@ namespace Planes
             _Program.Set3("meshColor", new Vector3(1, 1, 1));
             _Program.Set1("ambient", 1.0f);
             _Program.Set3("lightPos", new Vector3(2, 5, 2));
-            _Program.Set1("opacity", overlay ? 0.5f : 1.0f);
+            _Program.Set1("opacity", 1.0f);
             Matrix4 matWorldInvT = Matrix4.Identity;
             _Program.SetMat4("uWorld", ref matWorldInvT);
             _Program.SetMat4("uWorldInvTranspose", ref matWorldInvT);
