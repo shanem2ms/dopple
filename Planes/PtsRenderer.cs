@@ -29,9 +29,11 @@ namespace Planes
         VideoVis[] videoVis = new VideoVis[2];
         RenderTarget[] quads = new RenderTarget[2];
         DepthPtsVis[] depthVis = new DepthPtsVis[2];
+        AttitudeVis attVis;
         MatchVis matchVis;
         Selection selVis;
         RenderTarget pickTarget;
+        GridVis gridVis;
 
         float yRot = 0;
         float yRotDn;
@@ -159,6 +161,8 @@ namespace Planes
             }
             matchVis = new MatchVis();
             selVis = new Selection();
+            attVis = new AttitudeVis();
+            gridVis = new GridVis();
         }
 
         static Vector3 RotX(float a, Vector3 v)
@@ -182,6 +186,18 @@ namespace Planes
             return new Vector3(v.X * cosC - v.Y * sinC, v.X * sinC + v.Y * cosC, v.Z);
         }
 
+        Matrix4 CalcGravRot(int curFrame)
+        {
+            MotionPoint[] mpts = App.Recording.Frames[curFrame].motionPoints;
+            var mp = mpts[0];
+            Vector3 grav = new Vector3((float)mp.gX, (float)mp.gY, (float)mp.gZ);
+            grav.Normalize();
+            Vector3 basis = -Vector3.UnitY;
+            Quaternion qrot = new Quaternion(Vector3.Cross(basis, grav),
+                (float)Math.Sqrt(grav.LengthSquared * basis.LengthSquared) + Vector3.Dot(grav, basis));
+            return  Matrix4.CreateFromQuaternion(qrot);
+        }
+
         NrmPt[][] GetNrmPts(int curFrame)
         {
             NrmPt[][] ptArrays = new NrmPt[2][];
@@ -190,10 +206,11 @@ namespace Planes
             for (int idx = 0; idx < 2; ++idx)
             {
                 VideoFrame vf = App.Recording.Frames[curFrame + (idx * App.Settings.FrameDelta)].vf;
+                Matrix4 gravRot = CalcGravRot(curFrame + (idx * App.Settings.FrameDelta));
                 int dw = vf.DepthWidth;
                 int dh = vf.DepthHeight;
 
-                Matrix4 mat = idx == 0 ? Matrix4.Identity : this.alignMat;
+                Matrix4 mat = idx == 0 ? gravRot : gravRot * this.alignMat;
 
                 float invWidth = 1.0f / vf.ImageWidth * dw;
                 float invHeight = 1.0f / vf.ImageHeight * dh;
@@ -399,8 +416,12 @@ namespace Planes
                 GL.Clear(ClearBufferMask.DepthBufferBit);
                 GL.Enable(EnableCap.Blend);
                 GL.Enable(EnableCap.DepthTest);
+                gridVis.Render(viewProj);
                 if (i == 0)
+                {
                     depthVis[0].Render(viewProj, false, false);
+                    attVis.Render(viewProj);
+                }
                 else
                 {
                     matchVis.Render(viewProj, false);
@@ -693,6 +714,19 @@ namespace Planes
                     Matrix4.CreateFromQuaternion(
                     Quaternion.FromEulerAngles(new Vector3(offsetRotation.X, offsetRotation.Y, offsetRotation.Z)));
             }
+            else if (param == 4)
+            {
+                MotionPoint[] mpts = App.Recording.CurrentFrame.motionPoints;
+                var mp = mpts[0];
+                Vector3 grav = new Vector3((float)mp.gX, (float)mp.gY, (float)mp.gZ);
+                grav.Normalize();
+                Vector3 basis = -Vector3.UnitY;
+                Quaternion qrot = new Quaternion(Vector3.Cross(grav, basis),
+                    (float)Math.Sqrt(grav.LengthSquared * basis.LengthSquared) + Vector3.Dot(grav, basis));
+                Matrix4 rotMat = Matrix4.CreateFromQuaternion(qrot);
+                this.alignMat = rotMat;
+            }
+
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("OffsetTranslationX"));
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("OffsetTranslationY"));
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("OffsetTranslationZ"));

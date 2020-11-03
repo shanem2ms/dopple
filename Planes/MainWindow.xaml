@@ -111,6 +111,7 @@
                 <Button Grid.Row="9" Grid.Column="1" Content="Apply" Click="Button_Click_2"/>
                 <Button Grid.Row="10" Grid.Column="1" Content="Reset" Click="Button_Click_1"/>
                 <Button Grid.Row="11" Grid.Column="1" Content="Align LOD" Click="Button_Click_3"/>
+                <Button Grid.Row="11" Grid.Column="1" Content="Align Gravity" Click="Button_Click_4"/>
             </Grid>
 
         </DataTemplate>

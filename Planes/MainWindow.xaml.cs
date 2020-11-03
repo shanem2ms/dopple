@@ -52,7 +52,7 @@ namespace Planes
                 this.mode = value; RefreshMode();
             }
         }
-        Modes mode = Modes.Scene;
+        Modes mode = Modes.Points;
 
         public Dopple.Recording ActiveRecording => App.Recording;
         IRenderer[] renderers = new IRenderer[] {
@@ -202,6 +202,11 @@ namespace Planes
         private void Button_Click_3(object sender, RoutedEventArgs e)
         {
             AR.Action(3);
+        }
+
+        private void Button_Click_4(object sender, RoutedEventArgs e)
+        {
+            AR.Action(4);
         }        
     }
 

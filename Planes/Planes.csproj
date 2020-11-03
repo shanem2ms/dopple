@@ -137,6 +137,7 @@
       <SubType>Designer</SubType>
     </ApplicationDefinition>
     <Compile Include="Aligner.cs" />
+    <Compile Include="AttitudeVis.cs" />
     <Compile Include="CameraTrackVis.cs" />
     <Compile Include="Colors.cs" />
     <Compile Include="GridVis.cs" />
