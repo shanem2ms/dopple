@@ -334,6 +334,7 @@ namespace Dopple
         public ARFrmHeader hdr;
         public double diffTime;
         public int idx;
+        public MotionPoint[] motionPoints;
         public VideoFrame.PtMesh ptMesh;
         public bool HasDepth
         { get { return vf != null && vf.HasDepth; } }
@@ -357,4 +358,39 @@ namespace Dopple
             return (Frame)bf.Deserialize(ms);
         }
     }
+
+    [Serializable]
+    public struct MotionPoint
+    {
+        public double X, Y, Z;
+        public double rX, rY, rZ;
+        public double qX, qY, qZ, qW;
+        public double gX, gY, gZ;
+        public double timeStamp;
+
+        public MotionPoint(double x, double y, double z,
+            double rx, double ry, double rz,
+            double gx, double gy, double gz,
+            double qx, double qy, double qz, double qw,
+            double t)
+        {
+            X = x;
+            Y = y;
+            Z = z;
+            rX = rx;
+            rY = ry;
+            rZ = rz;
+            qX = qx;
+            qY = qy;
+            qZ = qz;
+            qW = qw;
+            gX = gx;
+            gY = gy;
+            gZ = gz;
+            timeStamp = t;
+        }
+
+        public override string ToString() => $"X = {X}, Y = {Y}, Z = {Z}";
+    }
+
 }
