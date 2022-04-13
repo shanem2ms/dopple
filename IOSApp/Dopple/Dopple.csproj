@@ -57,8 +57,6 @@
     </IpaIncludeArtwork>
     <IpaPackageName>
     </IpaPackageName>
-    <SignAssembly>false</SignAssembly>
-    <DelaySign>false</DelaySign>
     <CodesignProvision>VS: WildCard Development</CodesignProvision>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|iPhoneSimulator' ">
@@ -82,7 +80,7 @@
     <DefineConstants>DEBUG;ENABLE_TEST_CLOUD;</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <CodesignKey>Apple Development: Shane Morrison (N29TFRV4SC)</CodesignKey>
+    <CodesignKey>Apple Development: Shane Morrison (EE6F6TUKRZ)</CodesignKey>
     <DeviceSpecificBuild>true</DeviceSpecificBuild>
     <MtouchDebug>true</MtouchDebug>
     <MtouchNoSymbolStrip>true</MtouchNoSymbolStrip>
@@ -97,7 +95,6 @@
     <PlatformTarget>x86</PlatformTarget>
     <MtouchExtraArgs>
     </MtouchExtraArgs>
-    <CodesignProvision>VS: WildCard Development</CodesignProvision>
     <MtouchEnableSGenConc>true</MtouchEnableSGenConc>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'ReleaseNoOpt|iPhoneSimulator'">
@@ -109,6 +106,7 @@
     <UseVSHostingProcess>false</UseVSHostingProcess>
     <ErrorReport>prompt</ErrorReport>
     <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+    <MtouchLink>SdkOnly</MtouchLink>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'ReleaseNoOpt|iPhone'">
     <OutputPath>bin\iPhone\ReleaseNoOpt\</OutputPath>
@@ -123,6 +121,7 @@
     <MtouchFloat32>true</MtouchFloat32>
     <MtouchHttpClientHandler>NSUrlSessionHandler</MtouchHttpClientHandler>
     <MtouchDebug>true</MtouchDebug>
+    <MtouchLink>SdkOnly</MtouchLink>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(RunConfiguration)' == 'Default' ">
     <AppExtensionDebugBundleId />
