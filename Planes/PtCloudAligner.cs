@@ -80,6 +80,60 @@ namespace Planes
             return retval;
         }
 
+        static public void Test()
+        {
+            Vector3[] v0 = new Vector3[1000];
+            Vector3[] v1 = new Vector3[v0.Length];
+            IntPtr v1Ptr = Marshal.AllocHGlobal(v0.Length * 3 * sizeof(float));
+            IntPtr v2Ptr = Marshal.AllocHGlobal(v1.Length * 3 * sizeof(float));
+            IntPtr translatePtr = Marshal.AllocHGlobal(sizeof(float) * 3);
+            IntPtr rotatePtr = Marshal.AllocHGlobal(sizeof(float) * 4);
+
+            for (int t = 0; t < 10; ++t)
+            {
+                Random rnd = new Random();
+                List<Vector3> vecs0 = new List<Vector3>();
+                for (int i = 0; i < v0.Length; ++i)
+                {
+                    v0[i] = new Vector3((float)rnd.NextDouble() * 10 - 5,
+                        (float)rnd.NextDouble() * 10 - 5,
+                        (float)rnd.NextDouble() * 10 - 5);
+                }
+
+                Vector3 axis = new Vector3((float)rnd.NextDouble() - 0.5f,
+                    (float)rnd.NextDouble() - 0.5f,
+                    (float)rnd.NextDouble() - 0.5f).Normalized();
+
+                float angle = (float)rnd.NextDouble() * 0.1f;
+                Quaternion q = Quaternion.FromAxisAngle(axis, angle);
+                Vector3 offset = new Vector3((float)rnd.NextDouble() - 0.5f,
+                    (float)rnd.NextDouble() - 0.5f,
+                    (float)rnd.NextDouble() - 0.5f);
+                Matrix4 mat =
+                    Matrix4.CreateFromQuaternion(q) * Matrix4.CreateTranslation(offset);
+                List<Vector3> vecs1 = new List<Vector3>();
+                for (int i = 0; i < v0.Length; ++i)
+                {
+                    v1[i] = Vector3.TransformPosition(v0[i], mat);
+                }
+
+                DPEngine.CopyVec3Array(v0, v1Ptr);
+                DPEngine.CopyVec3Array(v1, v2Ptr);
+                DPEngine.BestFit(v1Ptr, (uint)v0.Length, v2Ptr, (uint)v1.Length, translatePtr,
+                    rotatePtr);
+                Vector3 translate = (Vector3)Marshal.PtrToStructure(translatePtr, typeof(Vector3));
+                Vector4 rotate = (Vector4)Marshal.PtrToStructure(rotatePtr, typeof(Vector4));
+
+                System.Diagnostics.Debug.WriteLine($"{translate} {offset}");
+                System.Diagnostics.Debug.WriteLine($"{rotate.W * 180.0f / (float)Math.PI}, {angle * 180.0f / (float)Math.PI}");
+            }
+
+            Marshal.FreeHGlobal(translatePtr);
+            Marshal.FreeHGlobal(rotatePtr);
+            Marshal.FreeHGlobal(v1Ptr);
+            Marshal.FreeHGlobal(v2Ptr);
+        }
+
         ~PtCloudAligner()
         {
             DPEngine.FreePtCloudAlign(this.aligner);

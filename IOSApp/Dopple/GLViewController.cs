@@ -133,9 +133,8 @@ namespace Dopple
             PreferredFramesPerSecond = 60;
             View.ContentScaleFactor = UIScreen.MainScreen.Scale;
             SetupGL();            
-            ARWorldTrackingConfiguration config = new ARWorldTrackingConfiguration();
+            ARFaceTrackingConfiguration config = new ARFaceTrackingConfiguration();
             config.LightEstimationEnabled = true;
-            config.EnvironmentTexturing = AREnvironmentTexturing.Automatic;
             arSession.Delegate = new ARDelegate(this);
             arSession.Run(config);
         }
@@ -308,8 +307,6 @@ namespace Dopple
                 float fltX = (float)at.start.X / (float)this.View.Frame.Width;
                 float fltY = (float)at.start.Y / (float)this.View.Frame.Height;
 
-                if (depthFloatBuffer == null)
-                    return;
                 int iX = (int)(fltX * depthHeight);
                 int iY = (int)(fltY * depthWidth);
                 double distMeters = this.depthFloatBuffer[iX * depthWidth + iY];
@@ -539,12 +536,6 @@ namespace Dopple
             double depthTimeStamp = frame.CapturedDepthDataTimestamp;
 
             hasDepth = false;
-
-            if (frame.SceneDepth != null)
-            {
-
-            }
-
             if (frame.CapturedDepthData != null)
             {
                 var depthData = frame.CapturedDepthData;

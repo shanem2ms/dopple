@@ -23,12 +23,15 @@ namespace Planes
         private TextureYUV _ImageTexture;
         private Matrix4 videoMatrix;
 
-        public DepthPtsVis(int _frameOffset)
+        public DepthPtsVis(int _frameOffset, bool _depthPts)
         {
+            this.depthPts = _depthPts;
             frameOffset = _frameOffset;
             _ImageTexture = new TextureYUV();
             _Program = Registry.Programs["depthpts"];
         }
+
+        bool depthPts = false;
 
         Vector3[] ptColors = new Vector3[]
         {
@@ -47,81 +50,109 @@ namespace Planes
             _ImageTexture.LoadImageFrame(vf.ImageWidth, vf.ImageHeight,
                 vf.imageData);
 
-            List<Vector3> mpts = new List<Vector3>();
-            List<uint> mindices = new List<uint>();
-            List<Vector3> qpts = new List<Vector3>();
-            List<Vector3> colors = new List<Vector3>();
-            List<uint> ind = new List<uint>();
-            float vwidth = vf.ImageWidth - 1;
-            float vheight = vf.ImageHeight - 1;
-            Matrix4 projMat = vf.CameraMatrix;
-            Matrix4 projInv = projMat.Inverted();
-            int dw = vf.DepthWidth;
-            int dh = vf.DepthHeight;
-            float pixelX = 1.0f / dw;
-            float pixelY = 1.0f / dh;
-            pixelX = pixelX * pixelX;
-            pixelY = pixelY * pixelY;
-            foreach (var p in ptArray)
+            if (depthPts)
             {
-                if (p == null)
-                    continue;
-
-                if (float.IsInfinity(p.pt.X))
-                    continue;
-
-                Vector3 rgbcol;
-                Vector3 c = vf.GetRGBVal((int)(p.spt.X * vwidth), (int)(p.spt.Y * vheight));
-                rgbcol = c;
-
-                Vector3 spt =
-                    Vector3.TransformPerspective(p.pt, projMat);
-                spt.X += pixelX;
-                spt.Y += pixelY;
-                Vector3 ptn = Vector3.TransformPerspective(spt, projInv);
-                float dx = Math.Abs((ptn - p.pt).X);
-                float dy = Math.Abs((ptn - p.pt).Y);
-
-                Vector3 ux, uy;
-                if (Math.Abs(p.nrm.X) > Math.Abs(p.nrm.Y))
+                List<Vector3> mpts = new List<Vector3>();
+                List<uint> mindices = new List<uint>();
+                List<Vector3> qpts = new List<Vector3>();
+                List<Vector3> colors = new List<Vector3>();
+                List<uint> ind = new List<uint>();
+                float vwidth = vf.ImageWidth - 1;
+                float vheight = vf.ImageHeight - 1;
+                Matrix4 projMat = vf.CameraMatrix;
+                Matrix4 projInv = projMat.Inverted();
+                int dw = vf.DepthWidth;
+                int dh = vf.DepthHeight;
+                float pixelX = 1.0f / dw;
+                float pixelY = 1.0f / dh;
+                pixelX = pixelX * pixelX;
+                pixelY = pixelY * pixelY;
+                foreach (var p in ptArray)
                 {
-                    ux = Vector3.Cross(Vector3.UnitY, p.nrm);
-                    uy = Vector3.Cross(ux, p.nrm);
+                    if (p == null)
+                        continue;
+
+                    if (float.IsInfinity(p.pt.X))
+                        continue;
+
+                    Vector3 rgbcol;
+                    Vector3 c = vf.GetRGBVal((int)(p.spt.X * vwidth), (int)(p.spt.Y * vheight));
+                    rgbcol = c;
+
+                    Vector3 spt =
+                        Vector3.TransformPerspective(p.pt, projMat);
+                    spt.X += pixelX;
+                    spt.Y += pixelY;
+                    Vector3 ptn = Vector3.TransformPerspective(spt, projInv);
+                    float dx = Math.Abs((ptn - p.pt).X);
+                    float dy = Math.Abs((ptn - p.pt).Y);
+
+                    Vector3 ux, uy;
+                    if (Math.Abs(p.nrm.X) > Math.Abs(p.nrm.Y))
+                    {
+                        ux = Vector3.Cross(Vector3.UnitY, p.nrm);
+                        uy = Vector3.Cross(ux, p.nrm);
+                    }
+                    else
+                    {
+                        uy = Vector3.Cross(Vector3.UnitX, p.nrm);
+                        ux = Vector3.Cross(uy, p.nrm);
+                    }
+
+                    uint cIdx = (uint)qpts.Count;
+                    qpts.Add(p.pt - ux * dx
+                               - uy * dy);
+                    qpts.Add(p.pt + ux * dx
+                               - uy * dy);
+                    qpts.Add(p.pt - ux * dx
+                               + uy * dy);
+                    qpts.Add(p.pt + ux * dx
+                               + uy * dy);
+
+                    rgbcol += tint * 0.35f;
+
+                    colors.Add(rgbcol);
+                    colors.Add(rgbcol);
+                    colors.Add(rgbcol);
+                    colors.Add(rgbcol);
+
+                    ind.Add(cIdx);
+                    ind.Add(cIdx + 1);
+                    ind.Add(cIdx + 2);
+                    ind.Add(cIdx + 1);
+                    ind.Add(cIdx + 3);
+                    ind.Add(cIdx + 2);
                 }
-                else
-                {
-                    uy = Vector3.Cross(Vector3.UnitX, p.nrm);
-                    ux = Vector3.Cross(uy, p.nrm);
-                }
 
-                uint cIdx = (uint)qpts.Count;
-                qpts.Add(p.pt - ux * dx
-                            - uy * dy);
-                qpts.Add(p.pt + ux * dx
-                            - uy * dy);
-                qpts.Add(p.pt - ux * dx
-                            + uy * dy);
-                qpts.Add(p.pt + ux * dx
-                            + uy * dy);
-
-                rgbcol += tint * 0.35f;
-
-                colors.Add(rgbcol);
-                colors.Add(rgbcol);
-                colors.Add(rgbcol);
-                colors.Add(rgbcol);
-
-                ind.Add(cIdx);
-                ind.Add(cIdx + 1);
-                ind.Add(cIdx + 2);
-                ind.Add(cIdx + 1);
-                ind.Add(cIdx + 3);
-                ind.Add(cIdx + 2);
+                Vector3[] nrm = new Vector3[qpts.Count];
+                for (int idx = 0; idx < nrm.Length; ++idx) nrm[idx] = new Vector3(0, 0, 1);
+                genVertexArray = new VertexArray(this._Program, qpts.ToArray(), ind.ToArray(), colors.ToArray(), nrm);
             }
+            else
+            {
+                Vector3[] pts, texcoords, nrms;
 
-            Vector3[] nrm = new Vector3[qpts.Count];
-            for (int idx = 0; idx < nrm.Length; ++idx) nrm[idx] = new Vector3(0, 0, 1);
-            genVertexArray = new VertexArray(this._Program, qpts.ToArray(), ind.ToArray(), colors.ToArray(), nrm);
+                int vtxcnt;
+                vf.MakePlanes(out pts, out texcoords, out vtxcnt);
+                uint[] depthindices = new uint[vtxcnt];
+                nrms = new Vector3[vtxcnt];
+                for (int idx = 0; idx < depthindices.Length; idx++)
+                {
+                    texcoords[idx] = ConvertColor(texcoords[idx]);
+                    depthindices[idx] = (uint)idx;
+                }
+                for (int idx = 0; idx < depthindices.Length; idx += 3)
+                {
+                    Vector3 v1 = pts[idx + 1] - pts[idx];
+                    Vector3 v2 = pts[idx + 2] - pts[idx + 1];
+                    Vector3 nrm = Vector3.Cross(v1, v2).Normalized();
+                    nrms[idx] = nrm;
+                    nrms[idx + 1] = nrm;
+                    nrms[idx + 2] = nrm;
+                }
+
+                genVertexArray = new VertexArray(this._Program, pts, depthindices, texcoords, nrms);
+            }
         }
 
 
@@ -134,9 +165,9 @@ namespace Planes
             _Program.SetMat4("uMVP", ref viewProjMat);
             _Program.Set1("opacity", 1.0f);
             _Program.Set3("meshColor", new Vector3(1, 1, 1));
-            _Program.Set1("ambient", 1.0f);
+            _Program.Set1("ambient", this.depthPts ? 1 : 0.4f);
             _Program.Set3("lightPos", new Vector3(2, 5, 2));
-            _Program.Set1("opacity", 1.0f);
+            _Program.Set1("opacity", overlay ? 0.5f : 1.0f);
             Matrix4 matWorldInvT = Matrix4.Identity;
             _Program.SetMat4("uWorld", ref matWorldInvT);
             _Program.SetMat4("uWorldInvTranspose", ref matWorldInvT);

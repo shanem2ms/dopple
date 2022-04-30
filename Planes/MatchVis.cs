@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Drawing.Drawing2D;
 using Dopple;
-using System.Diagnostics;
 
 namespace Planes
 {
@@ -60,18 +59,12 @@ namespace Planes
             List<Vector3> colors = new List<Vector3>();
             List<uint> ind = new List<uint>();
 
-            List<Tuple<int, float>> distList = new List<Tuple<int, float>>();
             for (int idx = 0; idx < matches.Length; idx += 2)
             {
                 var p0n = ptArrays[0][matches[idx]];
                 var p1n = ptArrays[1][matches[idx + 1]];
                 var p0 = p0n.pt;
-
-                Vector3 nrmDist = Vector3.Dot((p1n.pt - p0n.pt), p0n.nrm.Normalized()) * p0n.nrm;
-                var p1 = p0n.pt + nrmDist;
-
-                distList.Add(new  Tuple<int, float>(idx, nrmDist.LengthSquared));
-                //var p1 = p1n.pt;
+                var p1 = p1n.pt;
 
                 Matrix4 projMat = vf0.CameraMatrix;
                 Matrix4 projInv = projMat.Inverted();
@@ -106,7 +99,6 @@ namespace Planes
                 ind.Add(cIdx + 3);
                 ind.Add(cIdx + 2);
             }
-
 
             Vector3[] nrm = new Vector3[qpts.Count];
             for (int idx = 0; idx < nrm.Length; ++idx) nrm[idx] = new Vector3(0, 0, 1);

@@ -7,9 +7,6 @@ using System.Runtime.InteropServices;
 using System.Collections.Generic;
 using System.Linq;
 using Planes;
-using System.Diagnostics;
-using System.Drawing.Drawing2D;
-using OpenTK.Graphics.ES20;
 
 namespace Dopple
 {
@@ -70,7 +67,7 @@ namespace Dopple
         public static extern void ImageBlur(IntPtr pImageBuffer, IntPtr pOutEdges, int imageWidth, int iamgeHeight, int blur);        
 
         [DllImport("ptslib.dll")]
-        public static extern void DepthBuildLods(IntPtr pDepthBuffer, IntPtr outpts, int depthWidth, int depthHeight, float maxdist);
+        public static extern void DepthBuildLods(IntPtr pDepthBuffer, IntPtr outpts, int depthWidth, int depthHeight);
 
         [DllImport("ptslib.dll")]
         public static extern void DepthFindNormals(IntPtr pDepthPts, IntPtr pOutNormals, int ptx, int pty, int depthWidth, int depthHeight);
@@ -93,15 +90,10 @@ namespace Dopple
 
         public float[]GetDepthVals()
         {
-            return RawDepthLod(App.Settings.DepthLod);
-        }
-
-        float[]RawDepthLod(int lod)
-        {
             float[] depthVals = new float[depthHeight * depthWidth];
             System.Buffer.BlockCopy(depthData, 0, depthVals,
                 0, depthHeight * depthWidth * 4);
-            if (lod > 0)
+            if (App.Settings.DepthLod > 0)
                 return GetDepthLods(depthVals, depthWidth, depthHeight)[App.Settings.DepthLod - 1];
             else
                 return depthVals;
@@ -143,14 +135,9 @@ namespace Dopple
                     new Vector4(0, 0, 0, 1),
                     new Vector4(0, 0, 1, 0));
 
-                Matrix4 r1 = Matrix4.CreateRotationZ(-(float)Math.PI / 2.0f);
-                Matrix4 r2 = Matrix4.CreateRotationY((float)Math.PI);
-                Matrix4 cm = r1 * r2 * proj;
-                //Debug.WriteLine(proj);
-                //Debug.WriteLine(r1);
-                //Debug.WriteLine(r2);
-                //Debug.WriteLine(cm);
-                return cm;
+                return Matrix4.CreateRotationZ(-(float)Math.PI / 2.0f) *
+                    Matrix4.CreateRotationY((float)Math.PI) *
+                    proj;
             }
         }
 
@@ -172,11 +159,9 @@ namespace Dopple
             int depthWidth = DepthWidth;
 
             Dictionary<int, V3Pt> pos = new Dictionary<int, V3Pt>();
-            Vector3 minv = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
-            Vector3 maxv = new Vector3(float.MinValue, float.MinValue, float.MinValue);
+
             float []depthVals = GetDepthVals();
             Matrix4 cm = CameraMatrix;
-            float lastGoodDepth = -1;
             for (int y = 0; y < depthHeight; ++y)
             {
                 for (int x = 0; x < depthWidth; ++x)
@@ -184,21 +169,14 @@ namespace Dopple
                     float depthVal = depthVals[y * depthWidth + x];
                     if (!float.IsNaN(depthVal))
                     {
-                        lastGoodDepth = depthVal;
-                        //else
-                        //depthVal = lastGoodDepth;
-
                         float z = 1 / depthVal;
                         Vector4 modelPos = Vector4.Transform(cm, new Vector4(x, y, z, 1));
                         modelPos /= modelPos.W;
                         pos.Add(y * depthWidth + x, new V3Pt(new Vector3(modelPos.X, modelPos.Y, modelPos.Z),
                             new Vector2((float)x / (float)(depthWidth - 1), (float)y / (float)(depthHeight - 1))));
-                        minv.X = Math.Min(modelPos.X, minv.X);
-                        minv.Y = Math.Min(modelPos.Y, minv.Y);
-                        minv.Z = Math.Min(modelPos.Z, minv.Z);
-                        maxv.X = Math.Max(modelPos.X, maxv.X);
-                        maxv.Y = Math.Max(modelPos.Y, maxv.Y);
-                        maxv.Z = Math.Max(modelPos.Z, maxv.Z);
+                    }
+                    else
+                    {
                     }
                 }
             }
@@ -243,7 +221,7 @@ namespace Dopple
             IntPtr depthPtr = Marshal.AllocHGlobal(width * height * 4);
             IntPtr depthOut = Marshal.AllocHGlobal(totalFloats * 4);
             Marshal.Copy(depthVals, 0, depthPtr, depthVals.Length);
-            DepthBuildLods(depthPtr, depthOut, width, height, 100);
+            DepthBuildLods(depthPtr, depthOut, width, height);
 
             float[] alllods = new float[totalFloats];
             Marshal.Copy(depthOut, alllods, 0, totalFloats);

@@ -334,10 +334,10 @@ namespace Dopple
         public ARFrmHeader hdr;
         public double diffTime;
         public int idx;
-        public MotionPoint[] motionPoints;
         public VideoFrame.PtMesh ptMesh;
         public bool HasDepth
         { get { return vf != null && vf.HasDepth; } }
+        public MotionPoint []motionPoints = null;
 
         public void BuildData()
         {
@@ -392,5 +392,4 @@ namespace Dopple
 
         public override string ToString() => $"X = {X}, Y = {Y}, Z = {Z}";
     }
-
 }

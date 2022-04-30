@@ -79,10 +79,8 @@ namespace Planes
                     (float)mp.rY * yScale, (float)mp.rZ * yScale);
                 rList[0].Add(pt);
 
-                Quaterniond q = new Quaterniond(mp.qX, mp.qY, mp.qZ, mp.qW);                
-
-                Vector4 pt2 = new Vector4((float)xval0, (float)q.X * yScale,
-                    (float)q.Y * yScale, (float)q.Z * yScale);
+                Vector4 pt2 = new Vector4((float)xval0, (float)mp.X * yScale,
+                    (float)mp.Y * yScale, (float)mp.Z * yScale);
                 rList[1].Add(pt2);
 
                 Vector4 pt3 = new Vector4((float)xval0, (float)mp.gX * yScale,

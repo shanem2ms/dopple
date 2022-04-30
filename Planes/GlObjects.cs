@@ -865,32 +865,6 @@ namespace GLObjects
 
     }
 
-    static class Line
-    {
-        public static void Draw(Vector3 pt0, Vector3 pt1, float width, Vector3 color, List<Vector3> pts, List<uint> ind,
-                    List<Vector3> colors
-                    )
-        {
-            uint startIdx = (uint)pts.Count;
-            Vector3 dir = (pt1 - pt0).Normalized();
-            Vector3 nrm = Vector3.Cross(dir, Vector3.UnitZ);
-            pts.Add(pt0 - nrm * width);
-            pts.Add(pt0 + nrm * width);
-            pts.Add(pt1 - nrm * width);
-            pts.Add(pt1 + nrm * width);
-            colors.Add(color);
-            colors.Add(color);
-            colors.Add(color);
-            colors.Add(color);
-            ind.Add(startIdx);
-            ind.Add(startIdx + 1);
-            ind.Add(startIdx + 2);
-            ind.Add(startIdx + 1);
-            ind.Add(startIdx + 3);
-            ind.Add(startIdx + 2);
-        }
-    }
-
     class Cube
     {
         public static VertexArray MakeCube(Program program)

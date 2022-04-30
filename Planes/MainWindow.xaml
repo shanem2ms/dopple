@@ -34,12 +34,6 @@
                     <Label Content="Current Frame" Margin="10,5,5,5"/>
                     <TextBox Text="{Binding Path=CurrentFrameIdx, UpdateSourceTrigger=LostFocus}" Margin="5" />
                     <ToggleButton Content="Play" IsChecked="{Binding Path=IsPlaying}" />
-                    <Rectangle Width="50"/>
-                    <Rectangle Width="10" Fill="DarkGray" VerticalAlignment="Stretch"/>
-                    <Label Content="StartFrame" />
-                    <TextBox Text="{Binding Path=StartFrame, UpdateSourceTrigger=LostFocus}" Margin="5" />
-                    <Label Content="EndFrame" />
-                    <TextBox Text="{Binding Path=EndFrame, UpdateSourceTrigger=LostFocus}" Margin="5" />
                 </StackPanel>
 
             </Grid>
@@ -58,8 +52,6 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="50" />
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
@@ -108,64 +100,43 @@
 
                 <TextBlock Grid.Row="7" Grid.Column="1" Text="{Binding Path=TotalDist}" />
                 <Button Grid.Row="8" Grid.Column="1" Content="Align" Click="Button_Click"/>
-                <Button Grid.Row="9" Grid.Column="1" Content="Apply" Click="Button_Click_2"/>
-                <Button Grid.Row="10" Grid.Column="1" Content="Reset" Click="Button_Click_1"/>
-                <Button Grid.Row="11" Grid.Column="1" Content="Align LOD" Click="Button_Click_3"/>
-                <Button Grid.Row="11" Grid.Column="1" Content="Align Gravity" Click="Button_Click_4"/>
+                <Button Grid.Row="9" Grid.Column="1" Content="Reset" Click="Button_Click_1"/>
             </Grid>
 
         </DataTemplate>
     </Window.Resources>
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="25"/>
-            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="5" />
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-        <StackPanel Orientation="Horizontal">
-            <TextBlock Text="Mode"/>
-            <Grid>
-                <ComboBox Margin="10,0" MinWidth="150"
-                    ItemsSource="{Binding Source={local:EnumBindingSource {x:Type local:Modes}}}" 
-                          SelectedItem="{Binding Mode}"/>
-            </Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="100"/>
+            <ColumnDefinition/>
+            <ColumnDefinition Width="240"/>
+        </Grid.ColumnDefinitions>
+        <WindowsFormsHost x:Name="HostControl" Margin="0,0,0.333,19.667" Grid.Row="1" Grid.Column="1" Grid.RowSpan="2" >
+            <opentk:GLControl x:Name="glControl" Resize="glControl_Resize" />
+        </WindowsFormsHost>
+        <GridSplitter ResizeDirection="Rows" Grid.Row="2" Grid.ColumnSpan="3" VerticalAlignment="Stretch" HorizontalAlignment="Stretch"/>
+        <ProgressBar Grid.Row="3" Grid.Column="1" x:Name="DownloadProgres" Maximum="10000" Minimum="0" Margin="0,0.333,0.333,-0.333"/>
+        <StackPanel DataContext="{Binding Path=Settings}" Orientation="Vertical" Grid.Row="1" Grid.Column="0" Margin="0,0,0,19.667" Grid.RowSpan="2">
+            <Label Content="PlaneMinSize" />
+            <TextBox Text="{Binding Path=PlaneMinSize, UpdateSourceTrigger=LostFocus}"/>
+            <Label Content="PlaneThreshold" />
+            <TextBox Text="{Binding Path=PlaneThreshold, UpdateSourceTrigger=LostFocus}"/>
+            <Label Content="MinDPVal" />
+            <TextBox Text="{Binding Path=MinDPVal, UpdateSourceTrigger=LostFocus}"/>
+            <Label Content="MaxCoverage" />
+            <TextBox Text="{Binding Path=MaxCoverage, UpdateSourceTrigger=LostFocus}"/>
+            <Label Content="Blur" />
+            <TextBox Text="{Binding Path=Blur, UpdateSourceTrigger=LostFocus}"/>
+            <Label Content="DepthLod" />
+            <TextBox Text="{Binding DepthLod, UpdateSourceTrigger=LostFocus}"/>
         </StackPanel>
-        <Grid Grid.Row="1">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-                <RowDefinition Height="5" />
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="100"/>
-                <ColumnDefinition/>
-                <ColumnDefinition Width="240"/>
-            </Grid.ColumnDefinitions>
-            <WindowsFormsHost x:Name="HostControl" Margin="0,0,0.333,19.667" Grid.Row="1" Grid.Column="1" Grid.RowSpan="2" >
-                <opentk:GLControl x:Name="glControl" Resize="glControl_Resize" />
-            </WindowsFormsHost>
-            <GridSplitter ResizeDirection="Rows" Grid.Row="2" Grid.ColumnSpan="3" VerticalAlignment="Stretch" HorizontalAlignment="Stretch"/>
-            <ProgressBar Grid.Row="3" Grid.Column="1" x:Name="DownloadProgres" Maximum="10000" Minimum="0" Margin="0,0.333,0.333,-0.333"/>
-            <StackPanel DataContext="{Binding Path=Settings}" Orientation="Vertical" Grid.Row="1" Grid.Column="0" Margin="0,0,0,19.667" Grid.RowSpan="2">
-                <Label Content="PlaneMinSize" />
-                <TextBox Text="{Binding Path=PlaneMinSize, UpdateSourceTrigger=LostFocus}"/>
-                <Label Content="PlaneThreshold" />
-                <TextBox Text="{Binding Path=PlaneThreshold, UpdateSourceTrigger=LostFocus}"/>
-                <Label Content="MinDPVal" />
-                <TextBox Text="{Binding Path=MinDPVal, UpdateSourceTrigger=LostFocus}"/>
-                <Label Content="MaxCoverage" />
-                <TextBox Text="{Binding Path=MaxCoverage, UpdateSourceTrigger=LostFocus}"/>
-                <Label Content="Blur" />
-                <TextBox Text="{Binding Path=Blur, UpdateSourceTrigger=LostFocus}"/>
-                <Label Content="DepthLod" />
-                <TextBox Text="{Binding DepthLod, UpdateSourceTrigger=LostFocus}"/>
-                <Label Content="FrameDelta" />
-                <TextBox Text="{Binding Path=FrameDelta, UpdateSourceTrigger=LostFocus}"/>
-                <Label Content="MaxMatchDist" />
-                <TextBox Text="{Binding Path=MaxMatchDist, UpdateSourceTrigger=LostFocus}"/>
-            </StackPanel>
-            <ContentControl Grid.Row="1" Grid.Column="2" Content="{Binding AR}"/>
-            <ContentControl Margin="10,10.333,10.333,9.667" Grid.Row="3" Grid.Column="1" Content="{Binding ActiveRecording}" />
-        </Grid>
+        <ContentControl Grid.Row="1" Grid.Column="2" Content="{Binding AR}"/>
+        <ContentControl Margin="10,10.333,10.333,9.667" Grid.Row="3" Grid.Column="1" Content="{Binding ActiveRecording}" />
     </Grid>
 </Window>

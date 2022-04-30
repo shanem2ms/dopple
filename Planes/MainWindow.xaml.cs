@@ -3,7 +3,6 @@ using System.Windows;
 using OpenTK.Graphics.ES30;
 using OpenTK;
 using GLObjects;
-using System.Windows.Markup;
 using wf = System.Windows.Forms;
 using System.Windows.Input;
 using System.Diagnostics;
@@ -24,49 +23,24 @@ namespace Planes
         public abstract void MouseDn(int x, int y, wf.MouseButtons button);
         public abstract void MouseMove(int x, int y, wf.MouseButtons button);
         public abstract void MouseWheel(int x, int y, int delta);
-        public abstract void KeyDown(wf.KeyEventArgs e);
-        public abstract void KeyUp(wf.KeyEventArgs e);
         public abstract void Action(int param);
-
     }
-
-    public enum Modes
-    {
-        Video,
-        Depth,
-        Points,
-        Planes,
-        Motion,
-        Scene
-    };
-
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
     public partial class MainWindow : Window
     {
-        public Modes Mode
-        {
-            get => mode; set
-            {
-                this.mode = value; RefreshMode();
-            }
-        }
-        Modes mode = Modes.Points;
-
         public Dopple.Recording ActiveRecording => App.Recording;
         IRenderer[] renderers = new IRenderer[] {
                 new VideoRenderer(),
                 new DepthRenderer(),
-                new PtsRenderer(),
-                new PlanesRenderer(),
-                new MotionRenderer(),
-                new SceneRenderer()};
+                new PtsRenderer(), 
+                new MotionRenderer() };
         System.Timers.Timer renderTimer = new System.Timers.Timer();
 
         public Settings Settings => App.Settings;
 
-        public IRenderer AR => renderers[(int)Mode];
+        public IRenderer AR => renderers[2];
 
         public MainWindow()
         {
@@ -74,11 +48,6 @@ namespace Planes
             InitializeComponent();
             foreach (var r in renderers)
                 r.Invalidate = OnInvalidate;
-        }
-
-        void RefreshMode()
-        {
-
         }
 
         void OnInvalidate()
@@ -97,11 +66,6 @@ namespace Planes
             glControl.Invalidate();
         }
 
-        public void GlDebugProc(DebugSource source, DebugType type, int id, DebugSeverity severity, int length, IntPtr message, IntPtr userParam)
-        {
-            
-        }
-
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
             glControl.Paint += GlControl_Paint;
@@ -109,12 +73,9 @@ namespace Planes
             glControl.MouseMove += GlControl_MouseMove;
             glControl.MouseUp += GlControl_MouseUp;
             glControl.MouseWheel += GlControl_MouseWheel;
-            glControl.KeyDown += GlControl_KeyDown;
-            glControl.KeyUp += GlControl_KeyUp;
             renderTimer.Interval = 1.0f / 60.0f;
             renderTimer.Elapsed += RenderTimer_Elapsed;
 
-            GL.DebugMessageCallback(GlDebugProc, IntPtr.Zero);
             Registry.LoadAllPrograms();
             foreach (var r in renderers)
                 r.Load();
@@ -122,16 +83,6 @@ namespace Planes
             renderTimer.Start();
 
             ActiveRecording.OnDownloadProgress += ActiveRecording_OnDownloadProgress;
-        }
-
-        private void GlControl_KeyUp(object sender, wf.KeyEventArgs e)
-        {
-            AR.KeyUp(e);
-        }
-
-        private void GlControl_KeyDown(object sender, wf.KeyEventArgs e)
-        {
-            AR.KeyDown(e);
         }
 
         private void ActiveRecording_OnDownloadProgress(object sender, double e)
@@ -192,67 +143,6 @@ namespace Planes
         private void Button_Click_1(object sender, RoutedEventArgs e)
         {
             AR.Action(1);
-        }
-
-        private void Button_Click_2(object sender, RoutedEventArgs e)
-        {
-            AR.Action(2);
-        }
-
-        private void Button_Click_3(object sender, RoutedEventArgs e)
-        {
-            AR.Action(3);
-        }
-
-        private void Button_Click_4(object sender, RoutedEventArgs e)
-        {
-            AR.Action(4);
-        }        
-    }
-
-    public class EnumBindingSourceExtension : MarkupExtension
-    {
-        private Type _enumType;
-        public Type EnumType
-        {
-            get { return this._enumType; }
-            set
-            {
-                if (value != this._enumType)
-                {
-                    if (null != value)
-                    {
-                        Type enumType = Nullable.GetUnderlyingType(value) ?? value;
-                        if (!enumType.IsEnum)
-                            throw new ArgumentException("Type must be for an Enum.");
-                    }
-
-                    this._enumType = value;
-                }
-            }
-        }
-
-        public EnumBindingSourceExtension() { }
-
-        public EnumBindingSourceExtension(Type enumType)
-        {
-            this.EnumType = enumType;
-        }
-
-        public override object ProvideValue(IServiceProvider serviceProvider)
-        {
-            if (null == this._enumType)
-                throw new InvalidOperationException("The EnumType must be specified.");
-
-            Type actualEnumType = Nullable.GetUnderlyingType(this._enumType) ?? this._enumType;
-            Array enumValues = Enum.GetValues(actualEnumType);
-
-            if (actualEnumType == this._enumType)
-                return enumValues;
-
-            Array tempArray = Array.CreateInstance(actualEnumType, enumValues.Length + 1);
-            enumValues.CopyTo(tempArray, 1);
-            return tempArray;
         }
     }
 }
