@@ -1,5 +1,4 @@
 // dllmain.cpp : Defines the entry point for the DLL application.
-#include "pch.h"
 #include <cmath>
 #include <vector>
 #include <map>
@@ -107,8 +106,8 @@ extern "C"
 
         inline Pt& GetPt(int x, int y)
         {          
-            int ry = min(m_buffer.height - 1, y + m_rect.y);
-            int rx = min(m_buffer.width - 1, x + m_rect.x);
+            int ry = std::min(m_buffer.height - 1, y + m_rect.y);
+            int rx = std::min(m_buffer.width - 1, x + m_rect.x);
             return m_buffer.depthPths[ry * m_buffer.width + rx];
         }
 
@@ -547,7 +546,7 @@ extern "C"
                 for (int j = i + 1; j < 4; ++j)
                 {
                     longestDiag = 
-                        max(longestDiag, (pts[i] - pts[j]).LengthSq());
+                        std::max(longestDiag, (pts[i] - pts[j]).LengthSq());
                 }
             }
 

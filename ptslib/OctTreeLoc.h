@@ -8,6 +8,7 @@
 
 #include <gmtl/Vec.h>
 #include <gmtl/AABox.h>
+#include "OctGrid.h"
 using namespace gmtl;
 
 class OctTreeLoc

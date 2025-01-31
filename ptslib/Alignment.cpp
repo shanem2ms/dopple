@@ -1,10 +1,11 @@
 // dllmain.cpp : Defines the entry point for the DLL application.
-#include "pch.h"
 #include "kdtree++/kdtree.hpp"
 #include <gmtl/gmtl.h>
 #include <gmtl/Vec.h>
 #include <gmtl/Matrix.h>
 #include <vector>
+
+#define OutputDebugStringA(a)
 
 using namespace gmtl;
 

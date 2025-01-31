@@ -5,6 +5,7 @@
 
 using namespace gmtl;
 typedef unsigned int uint32;
+typedef unsigned long long uint64;
 typedef unsigned char uchar;
 
 template <typename T> class GridEmptyVal

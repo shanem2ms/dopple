@@ -1,5 +1,4 @@
 // dllmain.cpp : Defines the entry point for the DLL application.
-#include "pch.h"
 #include <cmath>
 #include <vector>
 #include <set>
@@ -11,6 +10,7 @@
 #include <gmtl/Vec.h>
 #include <gmtl/Matrix.h>
 #include <vector>
+#include "OctGrid.h"
 
 using namespace gmtl;
 
